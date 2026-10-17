@@ -7,6 +7,7 @@ import { requestId } from './middleware/requestId.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { systemRoutes } from './routes/system.js';
 import { sessionRoutes } from './routes/sessions.js';
+import { intakeRoutes } from './routes/intake.js';
 import { devRoutes } from './routes/dev.js';
 
 export function createApp(deps) {
@@ -45,6 +46,7 @@ export function createApp(deps) {
 
   app.use(systemRoutes(deps));
   app.use(sessionRoutes(deps));
+  app.use(intakeRoutes(deps));
   if (config.enableDevRoutes) app.use(devRoutes(deps));
 
   app.use(notFoundHandler);

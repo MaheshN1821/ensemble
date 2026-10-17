@@ -61,7 +61,7 @@ export default function Landing() {
           </p>
           <div className="mt-9 flex flex-wrap gap-3">
             <Button to="/start">Start with my photos</Button>
-            <Button to="/start" variant="secondary">Use a sample model</Button>
+            <Button to="/start" variant="secondary">Try a sample model</Button>
           </div>
           <p className="mt-5 text-sm text-ink-soft">No account. Photos are deleted within 24 hours.</p>
         </div>

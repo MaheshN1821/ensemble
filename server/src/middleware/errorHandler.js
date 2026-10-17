@@ -26,6 +26,8 @@ export function errorHandler(logger) {
       }
     } else if (err?.code === 'LIMIT_FILE_SIZE') {
       status = 413; code = 'FILE_TOO_LARGE'; message = 'That photo is over 10 MB. Choose a smaller file.';
+    } else if (err?.code === 'LIMIT_UNEXPECTED_FILE' || err?.code === 'LIMIT_FILE_COUNT') {
+      status = 400; code = 'NO_FILE'; message = 'Send one photo in the "image" field.';
     } else if (err?.type === 'entity.too.large') {
       status = 413; code = 'PAYLOAD_TOO_LARGE'; message = 'That request is too large.';
     }

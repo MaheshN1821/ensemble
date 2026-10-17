@@ -32,9 +32,19 @@ export function useSession() {
     }
   }, []);
 
+  /** Forget the current session (expired or deleted). The effect below then starts a fresh one. */
+  const reset = useCallback(() => {
+    try {
+      sessionStorage.removeItem(KEY);
+    } catch {
+      /* ignore */
+    }
+    setSession(null);
+  }, []);
+
   useEffect(() => {
     if (!session) start();
   }, [session, start]);
 
-  return { session, error, retry: start };
+  return { session, error, retry: start, reset };
 }

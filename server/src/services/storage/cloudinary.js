@@ -40,6 +40,12 @@ export function createCloudinaryStorage({ cloudName, apiKey, apiSecret }, logger
       return cloudinary.url(publicId, { type: 'authenticated', sign_url: true, secure: true, resource_type: 'image' });
     },
 
+    /** Deletes one stored photo. Safe to call for an id that no longer exists. */
+    async deleteAsset(publicId) {
+      if (!configured || !publicId) return;
+      await cloudinary.uploader.destroy(publicId, { type: 'authenticated', resource_type: 'image', invalidate: true });
+    },
+
     async deleteSession(sessionId) {
       if (!configured) return { deleted: 0 };
       const res = await cloudinary.api.delete_resources_by_tag(tagFor(sessionId), { type: 'authenticated', resource_type: 'image' });
