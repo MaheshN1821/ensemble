@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+/*
+  Ensemble design tokens.
+  Palette (named, used nowhere else):
+    ink      #14122B  text and dark surfaces
+    mist     #F6F4F9  page background (cool, slightly violet white)
+    rani     #C2306A  the one action colour: buttons, links, focus
+    peacock  #0F6A6E  confirmation and "ok" states
+    zari     #A9792B  ornament only (the metal in jewellery). Never used for text.
+    line     #E3DFEA  hairlines
+  Type: Outfit for everything; Geist Mono only for ledger and trace data.
+*/
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --color-ink: #14122b;
+  --color-ink-soft: #5b5873;
+  --color-mist: #f6f4f9;
+  --color-paper: #ffffff;
+  --color-line: #e3dfea;
+  --color-rani: #c2306a;
+  --color-rani-deep: #9e2455;
+  --color-rani-wash: #fbe9f1;
+  --color-peacock: #0f6a6e;
+  --color-peacock-wash: #e1f1f0;
+  --color-zari: #a9792b;
+  --color-zari-wash: #f4ead8;
+  --color-alert: #a3331f;
+  --color-alert-wash: #fbe8e4;
+}
+
+@layer base {
+  html {
+    background: var(--color-mist);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body { min-height: 100svh; }
+  :focus-visible {
+    outline: 2px solid var(--color-rani);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+  ::selection { background: var(--color-rani-wash); color: var(--color-ink); }
+}
+
+/* The one orchestrated moment on the landing page: the three arches rise once. */
+@keyframes arch-rise {
+  from { transform: translateY(28px) scaleY(0.94); opacity: 0; }
+  to   { transform: translateY(0) scaleY(1); opacity: 1; }
+}
+.arch-rise {
+  transform-origin: bottom center;
+  animation: arch-rise 720ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arch-rise { animation: none; }
+  html { scroll-behavior: auto; }
+}

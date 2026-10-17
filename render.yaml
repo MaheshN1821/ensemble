@@ -1,0 +1,32 @@
+# Render Blueprint. Dashboard: New > Blueprint > pick this repo.
+services:
+  - type: web
+    name: ensemble-api
+    runtime: node
+    rootDir: server
+    plan: starter            # Free instances sleep after 15 min idle. Use starter for the demo so judges never hit a cold start.
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ENABLE_DEV_ROUTES
+        value: "true"        # The System page needs it. Set to "false" before the final submission build if you prefer.
+      - key: CLIENT_ORIGINS
+        sync: false          # e.g. https://ensemble.vercel.app (no trailing slash; comma-separate extra origins)
+      - key: MONGODB_URI
+        sync: false
+      - key: YOUCAM_API_KEY
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: SESSION_UNIT_CAP
+        value: "120"
+      - key: GLOBAL_DAILY_UNIT_CAP
+        value: "900"
