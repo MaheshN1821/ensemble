@@ -13,6 +13,27 @@ const asset = new mongoose.Schema(
   { _id: false },
 );
 
+// Skin tone reading for the current selfie. Colour numbers and labels only, never the image or face data.
+const skinProfile = new mongoose.Schema(
+  {
+    selfieKey: String, // which selfie it was read from; a different selfie invalidates it
+    source: { type: String, enum: ['youcam', 'sample'] },
+    analysedAt: Date,
+    skin: { hex: String, L: Number, a: Number, b: Number, ita: Number, hue: Number, chroma: Number },
+    depth: { id: String, source: String },
+    undertone: { id: String, source: String, confidence: String },
+    signals: [String],
+    units: Number,
+    unitsKnown: Boolean,
+    taskId: String,
+    override: {
+      type: new mongoose.Schema({ undertone: { type: String, default: null }, depth: { type: String, default: null } }, { _id: false }),
+      default: null,
+    },
+  },
+  { _id: false },
+);
+
 // Metadata only. Photos and face data are never stored in the database (FR-31): we keep a storage reference,
 // never the image itself.
 const sessionSchema = new mongoose.Schema(
@@ -31,6 +52,7 @@ const sessionSchema = new mongoose.Schema(
       selfie: { type: asset, default: null },
       body: { type: asset, default: null },
     },
+    skinProfile: { type: skinProfile, default: null },
     preferences: {
       type: new mongoose.Schema(
         {

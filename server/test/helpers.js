@@ -130,6 +130,7 @@ export function createMemorySessions(ids = ['sess-1']) {
 
 export function createMemoryStorage({ configured = true } = {}) {
   const assets = new Map();
+  const buffers = new Map();
   let n = 0;
   return {
     provider: 'memory',
@@ -138,8 +139,10 @@ export function createMemoryStorage({ configured = true } = {}) {
     saveBuffer: async ({ sessionId, buffer, kind }) => {
       const publicId = `ensemble/${sessionId}/${kind}-${++n}`;
       assets.set(publicId, sessionId);
+      buffers.set(publicId, buffer);
       return { publicId, bytes: buffer.length };
     },
+    readBuffer: async (publicId) => buffers.get(publicId),
     signedUrl: (publicId) => `https://cdn.test/${publicId}?sig=1`,
     deleteAsset: async (publicId) => { assets.delete(publicId); },
     deleteSession: async (sessionId) => {

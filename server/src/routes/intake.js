@@ -133,6 +133,7 @@ export function intakeRoutes({ config, sessions, storage, logger }) {
 
       const set = { [`photos.${kind}`]: { source: 'upload', publicId: saved.publicId, width: info.width, height: info.height, bytes: req.file.size, addedAt: new Date() } };
       const unset = [];
+      if (kind === 'selfie') unset.push('skinProfile'); // a new selfie means a new reading
       // Never mix a sample photo with a real one.
       const other = kind === 'selfie' ? 'body' : 'selfie';
       const otherAsset = s.photos?.[other];
@@ -164,7 +165,7 @@ export function intakeRoutes({ config, sessions, storage, logger }) {
       if (!KINDS.includes(kind)) throw new AppError('NOT_FOUND', 'Photo type must be selfie or body.', 404);
       const old = req.session.photos?.[kind];
       if (old?.source === 'upload' && old.publicId) await storage.deleteAsset(old.publicId);
-      const next = await sessions.patch(req.session._id, { unset: [`photos.${kind}`] });
+      const next = await sessions.patch(req.session._id, { unset: kind === 'selfie' ? [`photos.${kind}`, 'skinProfile'] : [`photos.${kind}`] });
       if (!next) throw new AppError('SESSION_EXPIRED', 'Your session has ended. Start again to continue.', 401);
       res.json(present(next));
     }),
@@ -189,6 +190,7 @@ export function intakeRoutes({ config, sessions, storage, logger }) {
           'photos.selfie': { source: 'sample', sampleId: model.id, addedAt },
           'photos.body': { source: 'sample', sampleId: model.id, addedAt },
         },
+        unset: ['skinProfile'],
       });
       if (!next) throw new AppError('SESSION_EXPIRED', 'Your session has ended. Start again to continue.', 401);
       res.json(present(next));

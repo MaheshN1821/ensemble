@@ -9,7 +9,9 @@ import Details from '../components/intake/Details.jsx';
 import Review from '../components/intake/Review.jsx';
 import DeleteEverything from '../components/intake/DeleteEverything.jsx';
 import { ErrorNote } from '../components/intake/fields.jsx';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+
+const STEPS = ['consent', 'photos', 'details', 'review'];
 
 const firstIncomplete = (s) => {
   if (!s.consent?.over18) return 'consent';
@@ -27,6 +29,7 @@ export default function Start() {
   const [deleted, setDeleted] = useState(false);
   const [step, setStep] = useState(null);
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const onSessionLost = useCallback(() => { setStep(null); reset(); }, [reset]);
   const intake = useIntake(session?.sessionId, { onSessionLost });
   const { config, state } = intake;
@@ -36,10 +39,13 @@ export default function Start() {
   useEffect(() => {
     if (state && !initialised.current) {
       initialised.current = true;
-      setStep(firstIncomplete(state));
+      // /start?step=photos lets other pages send the person straight to the step to fix (never past the first incomplete one).
+      const wanted = params.get('step');
+      const first = firstIncomplete(state);
+      setStep(STEPS.includes(wanted) && STEPS.indexOf(wanted) <= STEPS.indexOf(first) ? wanted : first);
     }
     if (!state) initialised.current = false;
-  }, [state]);
+  }, [state, params]);
 
   // Move keyboard and screen-reader focus to the new step's heading.
   const focusReady = useRef(false);

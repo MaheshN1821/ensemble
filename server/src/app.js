@@ -8,6 +8,8 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { systemRoutes } from './routes/system.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { intakeRoutes } from './routes/intake.js';
+import { skinRoutes } from './routes/skin.js';
+import { createSkinService } from './services/skin/service.js';
 import { devRoutes } from './routes/dev.js';
 
 export function createApp(deps) {
@@ -47,6 +49,8 @@ export function createApp(deps) {
   app.use(systemRoutes(deps));
   app.use(sessionRoutes(deps));
   app.use(intakeRoutes(deps));
+  const skin = deps.skin ?? createSkinService(deps);
+  app.use(skinRoutes({ ...deps, skin }));
   if (config.enableDevRoutes) app.use(devRoutes(deps));
 
   app.use(notFoundHandler);

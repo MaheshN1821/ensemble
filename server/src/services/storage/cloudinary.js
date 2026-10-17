@@ -36,6 +36,15 @@ export function createCloudinaryStorage({ cloudName, apiKey, apiSecret }, logger
       });
     },
 
+    /** Downloads a stored photo so it can be sent to YouCam. Capped so a bad record cannot exhaust memory. */
+    async readBuffer(publicId) {
+      const res = await fetch(this.signedUrl(publicId), { signal: AbortSignal.timeout(20_000) });
+      if (!res.ok) throw new Error(`Could not read stored photo (${res.status})`);
+      const buffer = Buffer.from(await res.arrayBuffer());
+      if (buffer.length > 12 * 1024 * 1024) throw new Error('Stored photo is larger than expected');
+      return buffer;
+    },
+
     signedUrl(publicId) {
       return cloudinary.url(publicId, { type: 'authenticated', sign_url: true, secure: true, resource_type: 'image' });
     },
