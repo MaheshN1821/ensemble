@@ -40,3 +40,7 @@ Use the `starter` plan so the instance never sleeps during judging.
 Then add the Vercel URL to `CLIENT_ORIGINS` on Render and redeploy the server.
 
 **MongoDB Atlas:** allow Render's outbound IPs (or `0.0.0.0/0` for the hackathon) under Network Access.
+
+## How looks are planned
+The planner is deterministic and free (no YouCam call, no language model): `server/src/config/planner.js` holds the weights and rules, `server/src/services/planner/` the search. Same inputs always give the same three looks, and the budget is a hard limit. Open `/looks` after the colour profile.
+

@@ -140,10 +140,10 @@ export function Ready({ intake, profile, options, adjusting, adjustError, setOve
       </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
+        <Button to="/looks">See my looks</Button>
         <Button to="/start" variant="secondary">Change my details</Button>
-        <Button to="/">Back to home</Button>
       </div>
-      <p className="mt-5 max-w-[52ch] text-[14px] text-ink-soft">Next, we choose items from the catalogue to match this profile and your budget.</p>
+      <p className="mt-5 max-w-[52ch] text-[14px] text-ink-soft">Next, we plan three looks from the catalog that match this profile, your occasion and your budget.</p>
     </div>
   );
 }

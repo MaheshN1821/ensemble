@@ -10,6 +10,8 @@ import { sessionRoutes } from './routes/sessions.js';
 import { intakeRoutes } from './routes/intake.js';
 import { skinRoutes } from './routes/skin.js';
 import { catalogRoutes } from './routes/catalog.js';
+import { plannerRoutes } from './routes/planner.js';
+import { createPlannerService } from './services/planner/service.js';
 import { createSkinService } from './services/skin/service.js';
 import { createCatalogService } from './services/catalog/service.js';
 import { createMemoryCatalogRepo } from './services/catalog/repoMemory.js';
@@ -66,6 +68,8 @@ export function createApp(deps) {
   app.use(skinRoutes({ ...deps, skin }));
   const catalogs = deps.catalogs ?? createDefaultCatalogService(deps);
   app.use(catalogRoutes({ ...deps, catalogs }));
+  const planner = deps.planner ?? createPlannerService({ catalogs, skin });
+  app.use(plannerRoutes({ ...deps, planner }));
   if (config.enableDevRoutes) app.use(devRoutes(deps));
 
   app.use(notFoundHandler);
