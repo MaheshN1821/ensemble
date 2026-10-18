@@ -55,6 +55,32 @@ export function createCloudinaryStorage({ cloudName, apiKey, apiSecret }, logger
       await cloudinary.uploader.destroy(publicId, { type: 'authenticated', resource_type: 'image', invalidate: true });
     },
 
+    // ---- Catalog product images (Stage 4). Public delivery type: these are product photos the retailer chose to show. ----
+    /** Stores a retailer's product photo and asks Cloudinary for its predominant colours. */
+    async saveCatalogImage({ catalogId, itemId, buffer }) {
+      const res = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: `ensemble-catalog/${catalogId}`, public_id: itemId, overwrite: true, resource_type: 'image', colors: true },
+          (err, r) => (err ? reject(err) : resolve(r)),
+        );
+        stream.end(buffer);
+      });
+      // `colors` is [[hex, percent], ...]
+      const colours = Array.isArray(res.colors) ? res.colors.map(([hex, weight]) => ({ hex, weight })) : [];
+      return { url: res.secure_url, publicId: res.public_id, colours };
+    },
+
+    async deleteCatalogImage(publicId) {
+      if (!configured || !publicId) return;
+      await cloudinary.uploader.destroy(publicId, { resource_type: 'image', invalidate: true });
+    },
+
+    async deleteCatalog(catalogId) {
+      if (!configured) return { deleted: 0 };
+      const res = await cloudinary.api.delete_resources_by_prefix(`ensemble-catalog/${catalogId}/`, { resource_type: 'image' });
+      return { deleted: Object.values(res.deleted ?? {}).filter((v) => v === 'deleted').length };
+    },
+
     async deleteSession(sessionId) {
       if (!configured) return { deleted: 0 };
       const res = await cloudinary.api.delete_resources_by_tag(tagFor(sessionId), { type: 'authenticated', resource_type: 'image' });

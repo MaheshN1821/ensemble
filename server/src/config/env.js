@@ -12,6 +12,10 @@ const schema = z.object({
   PORT: z.coerce.number().int().default(8080),
   LOG_LEVEL: z.string().default('info'),
   CLIENT_ORIGINS: z.string().default('http://localhost:5173'),
+  // Public address of the client. Sample catalog images are served from there, so the server needs it to fetch them at render time.
+  PUBLIC_CLIENT_URL: z.string().url().optional(),
+  CATALOG_TTL_DAYS: num(30, 1),
+  CATALOG_IMPORTS_PER_HOUR: num(12, 1),
 
   MONGODB_URI: z.string().min(1, 'is required'),
 
@@ -61,6 +65,9 @@ export function loadEnv(source = process.env) {
     port: e.PORT,
     logLevel: e.LOG_LEVEL,
     clientOrigins: e.CLIENT_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean),
+    publicClientUrl: e.PUBLIC_CLIENT_URL || e.CLIENT_ORIGINS.split(',')[0].trim(),
+    catalogTtlDays: e.CATALOG_TTL_DAYS,
+    catalogImportsPerHour: e.CATALOG_IMPORTS_PER_HOUR,
     mongoUri: e.MONGODB_URI,
     youcam: {
       apiKey: e.YOUCAM_API_KEY,

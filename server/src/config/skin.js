@@ -61,6 +61,9 @@ export const COLOUR_FAMILIES = {
   mint: { label: 'Mint', hex: '#A8D8C0', group: 'green' },
   camel: { label: 'Camel', hex: '#B98A5B', group: null },
   black: { label: 'Black', hex: '#1A1A1F', group: 'black' },
+  // Added in Stage 4 so catalog colours always land on a family. Not in any palette, so the planner scores them as neutral.
+  grey: { label: 'Grey', hex: '#8A8A92', group: null },
+  brown: { label: 'Brown', hex: '#6B4A35', group: null },
 };
 
 // Per undertone: families that suit, and families to wear with care (still allowed, just not led with).

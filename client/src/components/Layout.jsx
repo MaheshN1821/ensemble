@@ -17,6 +17,8 @@ function Header() {
           <a href="/#how" className="hidden text-[15px] text-ink-soft transition-colors hover:text-rani sm:block">
             How it works
           </a>
+          <NavLink to="/catalog" className={link}>Catalog</NavLink>
+          <NavLink to="/retailer" className={`${link} hidden sm:block`}>For retailers</NavLink>
           <NavLink to="/system" className={link}>System</NavLink>
           <Button to="/start" className="h-10 px-5 text-sm">Start</Button>
         </nav>

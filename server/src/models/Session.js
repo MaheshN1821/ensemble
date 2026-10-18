@@ -53,6 +53,7 @@ const sessionSchema = new mongoose.Schema(
       body: { type: asset, default: null },
     },
     skinProfile: { type: skinProfile, default: null },
+    catalogId: { type: String, default: null }, // which catalog the planner uses; null means the sample catalog
     preferences: {
       type: new mongoose.Schema(
         {

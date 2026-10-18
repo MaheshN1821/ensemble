@@ -24,6 +24,9 @@ npm run dev:client    # http://localhost:5173  (proxies /api to the server)
 Open http://localhost:5173/system. It should show every service as connected. Use **Fetch live prices** (free) first,
 then **Run skin tone analysis** with a selfie to push one real task through the queue and see it land in the ledger.
 
+Sample catalog images are placeholders generated offline: `npm --prefix server run assets` (free). For AI-generated
+images later: `npm --prefix server run assets -- --ai --yes --only <itemId>` (spends units; see the script header).
+
 ```bash
 npm test    # server tests run against a local mock of the YouCam API and spend no units
 ```

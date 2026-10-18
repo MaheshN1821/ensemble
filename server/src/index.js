@@ -9,6 +9,11 @@ import { createGateway } from './services/youcam/gateway.js';
 import { createMongoLedger } from './services/ledger.js';
 import { createSessionService } from './services/sessions.js';
 import { createCloudinaryStorage } from './services/storage/cloudinary.js';
+import { createMongoCatalogRepo } from './services/catalog/repo.js';
+import { createCatalogService } from './services/catalog/service.js';
+import { createImporter } from './services/catalog/importer.js';
+import { createSafeFetcher } from './lib/safeFetch.js';
+import { LIMITS } from './config/catalog.js';
 import { createApp } from './app.js';
 
 let config;
@@ -53,9 +58,25 @@ const gateway = createGateway({
 });
 const sessions = createSessionService({ ttlHours: config.sessionTtlHours });
 
+const catalogs = createCatalogService({
+  repo: createMongoCatalogRepo(),
+  importer: createImporter({
+    fetcher: createSafeFetcher({ maxBytes: LIMITS.maxImageBytes, timeoutMs: LIMITS.imageTimeoutMs, maxRedirects: LIMITS.maxRedirects }),
+    storage,
+    logger,
+  }),
+  storage,
+  config,
+  logger,
+});
+await catalogs.ensureSample();
+// Merchant catalogs are temporary. Sweep once at boot, then hourly.
+catalogs.sweepExpired().catch((err) => logger.error({ err: err.message }, 'catalog sweep failed'));
+setInterval(() => catalogs.sweepExpired().catch((err) => logger.error({ err: err.message }, 'catalog sweep failed')), 3_600_000).unref();
+
 const dbStates = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
 const app = createApp({
-  config, logger, gateway, ledger, storage, queue, sessions,
+  config, logger, gateway, ledger, storage, queue, sessions, catalogs,
   dbState: () => dbStates[mongoose.connection.readyState] ?? 'unknown',
 });
 

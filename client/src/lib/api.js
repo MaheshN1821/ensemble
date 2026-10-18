@@ -11,9 +11,10 @@ export class ApiError extends Error {
 }
 
 /** Fetch wrapper: JSON in/out, session header, and errors that already carry a user-facing message. */
-export async function api(path, { method = 'GET', body, sessionId, signal } = {}) {
+export async function api(path, { method = 'GET', body, sessionId, catalogToken, signal } = {}) {
   const headers = {};
   if (sessionId) headers['X-Session-Id'] = sessionId;
+  if (catalogToken) headers['X-Catalog-Token'] = catalogToken;
   let payload;
   if (body instanceof FormData) {
     payload = body;
@@ -32,7 +33,9 @@ export async function api(path, { method = 'GET', body, sessionId, signal } = {}
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     const e = data?.error;
-    throw new ApiError(e?.message || 'Something went wrong. Try again.', { status: res.status, code: e?.code, requestId: e?.requestId });
+    const err = new ApiError(e?.message || 'Something went wrong. Try again.', { status: res.status, code: e?.code, requestId: e?.requestId });
+    err.details = e?.details; // e.g. the import report on IMPORT_REJECTED
+    throw err;
   }
   return data;
 }

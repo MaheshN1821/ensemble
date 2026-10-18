@@ -9,8 +9,21 @@ import { systemRoutes } from './routes/system.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { intakeRoutes } from './routes/intake.js';
 import { skinRoutes } from './routes/skin.js';
+import { catalogRoutes } from './routes/catalog.js';
 import { createSkinService } from './services/skin/service.js';
+import { createCatalogService } from './services/catalog/service.js';
+import { createMemoryCatalogRepo } from './services/catalog/repoMemory.js';
+import { createImporter } from './services/catalog/importer.js';
+import { createSafeFetcher } from './lib/safeFetch.js';
+import { LIMITS } from './config/catalog.js';
 import { devRoutes } from './routes/dev.js';
+
+// Tests pass their own catalog service; production passes one built over Mongo in index.js. This default keeps
+// createApp usable with the older dependency set (in-memory repository, real image fetcher).
+function createDefaultCatalogService({ config, logger, storage }) {
+  const fetcher = createSafeFetcher({ maxBytes: LIMITS.maxImageBytes, timeoutMs: LIMITS.imageTimeoutMs, maxRedirects: LIMITS.maxRedirects });
+  return createCatalogService({ repo: createMemoryCatalogRepo(), importer: createImporter({ fetcher, storage, logger }), storage, config, logger });
+}
 
 export function createApp(deps) {
   const { config, logger } = deps;
@@ -29,7 +42,7 @@ export function createApp(deps) {
         if (!origin || config.clientOrigins.includes(origin)) return cb(null, true);
         return cb(null, false);
       },
-      allowedHeaders: ['Content-Type', 'X-Session-Id', 'X-Request-Id'],
+      allowedHeaders: ['Content-Type', 'X-Session-Id', 'X-Request-Id', 'X-Catalog-Token'],
       exposedHeaders: ['X-Request-Id'],
       maxAge: 600,
     }),
@@ -51,6 +64,8 @@ export function createApp(deps) {
   app.use(intakeRoutes(deps));
   const skin = deps.skin ?? createSkinService(deps);
   app.use(skinRoutes({ ...deps, skin }));
+  const catalogs = deps.catalogs ?? createDefaultCatalogService(deps);
+  app.use(catalogRoutes({ ...deps, catalogs }));
   if (config.enableDevRoutes) app.use(devRoutes(deps));
 
   app.use(notFoundHandler);
