@@ -219,9 +219,10 @@ export function planLooks({ items, profile, prefs, constraints = {} }) {
 
 /**
  * Swaps one item in a look for the best replacement that keeps the look within budget (the `swap_item` tool).
+ * `filter(item)` optionally narrows the candidates first (Stage 7: "cheaper", "warmer", "less formal").
  * Returns { ok:true, look } or { ok:false, reason, message }.
  */
-export function swapItem({ look, slot, items, profile, prefs, constraints = {} }) {
+export function swapItem({ look, slot, items, profile, prefs, constraints = {}, filter = null }) {
   const ctx = buildContext({ profile, prefs, constraints });
   const current = look.items[slot];
   const exclude = new Set([...ctx.excludeItemIds, current?.id].filter(Boolean));
@@ -230,6 +231,8 @@ export function swapItem({ look, slot, items, profile, prefs, constraints = {} }
   if (!candidates) return { ok: false, reason: 'BAD_SLOT', message: 'You can swap the outfit, necklace, earrings or lipstick.' };
   if (slot === 'outfit') candidates = eligibleOutfits(candidates, ctx, LEVELS.at(-1));
   if (JEWELLERY.includes(slot)) candidates = candidates.filter((j) => !(ctx.metalPref && j.metalTone !== ctx.metalPref) && !colourAvoided(j, ctx));
+  // `filter` lets a caller ask for a direction (cheaper, warmer, less formal) while the planner still scores and picks.
+  if (typeof filter === 'function') candidates = candidates.filter(filter);
   const rest = priceOf({ ...look.items, [slot]: null });
   let best = null;
   for (const c of candidates) {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useSession } from '../hooks/useSession.js';
 import { useSkinProfile } from '../hooks/useSkinProfile.js';
+import LoadingBlock from '../components/ui/LoadingBlock.jsx';
 import Button from '../components/Button.jsx';
 import Analysing from '../components/profile/Analysing.jsx';
 import Adjust from '../components/profile/Adjust.jsx';
@@ -164,7 +165,7 @@ export default function Profile() {
   }
 
   if (p.phase === 'loading') {
-    return <Shell><p role="status" className="text-ink-soft">Getting ready…</p></Shell>;
+    return <Shell><LoadingBlock label="Getting ready…" /></Shell>;
   }
 
   if (p.phase === 'incomplete') {

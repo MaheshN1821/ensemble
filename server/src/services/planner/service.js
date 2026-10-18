@@ -25,14 +25,17 @@ export function createPlannerService({ catalogs, skin }) {
 
       const { catalog, items, fellBack } = await catalogs.itemsForSession(session);
       const profile = effectiveProfile(stored);
-      const plan = planLooks({ items, profile, prefs: session.preferences, constraints });
+      // Items the shopper told the agent to stop showing stay out of every plan (Stage 7).
+      const kept = session.agent?.excludeItemIds ?? [];
+      const merged = kept.length ? { ...constraints, excludeItemIds: [...new Set([...(constraints.excludeItemIds ?? []), ...kept])] } : constraints;
+      const plan = planLooks({ items, profile, prefs: session.preferences, constraints: merged });
       return {
         ...plan,
         catalog: { id: catalog.id, name: catalog.name, source: catalog.source, itemCount: catalog.itemCount, fellBack },
         profile: { ...profile, undertoneLabel: skin.present(stored, session).undertone.label, depthLabel: skin.present(stored, session).depth.label },
         constraints: {
           budgetInr: constraints.budgetInr ?? null,
-          excludeItemIds: constraints.excludeItemIds ?? [],
+          excludeItemIds: merged.excludeItemIds ?? [],
         },
       };
     },

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from '../hooks/useSession.js';
 import { useIntake } from '../hooks/useIntake.js';
+import LoadingBlock from '../components/ui/LoadingBlock.jsx';
 import Button from '../components/Button.jsx';
 import Stepper from '../components/intake/Stepper.jsx';
 import Consent from '../components/intake/Consent.jsx';
@@ -92,7 +93,7 @@ export default function Start() {
   if (!config || !state || !step) {
     return (
       <Shell>
-        <p role="status" className="text-ink-soft">Getting ready…</p>
+        <LoadingBlock label="Getting ready…" />
       </Shell>
     );
   }

@@ -12,6 +12,9 @@ import { skinRoutes } from './routes/skin.js';
 import { catalogRoutes } from './routes/catalog.js';
 import { plannerRoutes } from './routes/planner.js';
 import { renderRoutes } from './routes/render.js';
+import { agentRoutes } from './routes/agent.js';
+import { createAgentService } from './services/agent/service.js';
+import { createLlm } from './services/agent/llm.js';
 import { createRenderService } from './services/render/service.js';
 import { createPlannerService } from './services/planner/service.js';
 import { createSkinService } from './services/skin/service.js';
@@ -74,11 +77,16 @@ export function createApp(deps) {
     ...deps, catalogs, skin,
     safeFetcher: createSafeFetcher({ maxBytes: RENDER_LIMITS.garmentMaxBytes, timeoutMs: RENDER_LIMITS.garmentTimeoutMs, maxRedirects: LIMITS.maxRedirects }),
   });
-  app.use(intakeRoutes({ ...deps, renders }));
+  const agent = deps.agent ?? createAgentService({
+    config, logger, sessions: deps.sessions, catalogs, skin, renders, ledger: deps.ledger,
+    llm: deps.llm ?? createLlm({ config: config.agent?.llm, logger }),
+  });
+  app.use(intakeRoutes({ ...deps, renders, agent }));
   app.use(skinRoutes({ ...deps, skin }));
   app.use(catalogRoutes({ ...deps, catalogs }));
   app.use(plannerRoutes({ ...deps, planner }));
   app.use(renderRoutes({ ...deps, renders }));
+  app.use(agentRoutes({ ...deps, agent }));
   if (config.enableDevRoutes) app.use(devRoutes(deps));
 
   app.use(notFoundHandler);

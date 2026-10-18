@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import Button from '../components/Button.jsx';
 
 const slots = [
@@ -96,6 +97,19 @@ export default function Landing() {
               </div>
             ))}
           </dl>
+        </div>
+      </section>
+
+      <section aria-labelledby="open-h" className="mx-auto mt-28 max-w-6xl px-5 sm:mt-36 sm:px-8">
+        <div className="grid gap-8 rounded-3xl bg-ink p-8 text-white sm:p-12 lg:grid-cols-[1.1fr_1fr] lg:items-end">
+          <div>
+            <h2 id="open-h" className="max-w-[18ch] text-[30px] font-light leading-[1.1] tracking-[-0.03em] sm:text-[40px]">Nothing hidden: every call and its cost.</h2>
+            <p className="mt-4 max-w-[46ch] text-[16px] leading-relaxed text-white/80">Open &ldquo;Under the hood&rdquo; at any time to see each step, how long it took and the units it used. Retailers can bring a catalog and see how shoppers use it.</p>
+          </div>
+          <div className="flex flex-wrap gap-3 lg:justify-end">
+            <Link to="/start" className="inline-flex h-12 items-center justify-center rounded-full bg-white px-6 text-[15px] font-medium text-ink transition-colors hover:bg-mist">Start with a sample model</Link>
+            <Link to="/retailer" className="inline-flex h-12 items-center justify-center rounded-full border border-white/40 px-6 text-[15px] font-medium text-white transition-colors hover:border-white">For retailers</Link>
+          </div>
         </div>
       </section>
     </>

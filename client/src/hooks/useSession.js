@@ -1,17 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 
-const KEY = 'ensemble.session';
-
-function readStored() {
-  try {
-    const s = JSON.parse(sessionStorage.getItem(KEY));
-    if (s?.sessionId && new Date(s.expiresAt) > new Date()) return s;
-  } catch {
-    /* ignore */
-  }
-  return null;
-}
+import { SESSION_KEY as KEY, readStoredSession as readStored } from '../lib/session.js';
 
 /**
  * Anonymous session: a random id kept in sessionStorage only (cleared when the tab closes).

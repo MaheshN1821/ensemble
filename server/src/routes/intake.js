@@ -69,7 +69,7 @@ export function validatePhoto(kind, buffer) {
   return info;
 }
 
-export function intakeRoutes({ config, sessions, storage, logger, renders }) {
+export function intakeRoutes({ config, sessions, storage, logger, renders, agent }) {
   const router = Router();
   const auth = requireSession(sessions);
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_PHOTO_BYTES, files: 1 } });
@@ -233,6 +233,7 @@ export function intakeRoutes({ config, sessions, storage, logger, renders }) {
         throw new AppError('DELETE_FAILED', 'We could not remove your photos just now. Nothing was lost. Try again in a moment.', 502);
       }
       await sessions.remove(req.session._id);
+      agent?.forget(req.session._id); // the trace holds step names only, but it goes with everything else (FR-32)
       res.json({ deleted: true, photosDeleted });
     }),
   );

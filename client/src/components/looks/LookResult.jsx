@@ -1,4 +1,5 @@
 import { TYPE_LABEL, rupees } from '../../lib/format.js';
+import ZoomImage from '../ui/ZoomImage.jsx';
 
 const STATUS_TEXT = { idle: 'Not started', queued: 'Waiting', running: 'Drawing now', done: 'Done', failed: 'Did not finish' };
 // Text and a symbol always go with the status, so colour never carries the meaning alone.
@@ -19,10 +20,7 @@ function Panel({ title, image, stages, label, aspect }) {
     <figure className="m-0 overflow-hidden rounded-2xl border border-line bg-paper">
       <div className={`relative ${aspect} bg-mist`}>
         {image ? (
-          <>
-            <img src={image.url} alt={image.alt} className="size-full object-contain" />
-            <figcaption className="absolute inset-x-0 bottom-0 bg-ink/85 px-3 py-2 text-[12px] leading-snug text-white">{label}</figcaption>
-          </>
+          <ZoomImage src={image.url} alt={image.alt} caption={label} aspect="size-full" />
         ) : (
           <div className="flex size-full flex-col items-center justify-center gap-3 p-6 text-center">
             <span className={`flex gap-1.5 ${working ? 'arch-pulse' : ''}`} aria-hidden="true">

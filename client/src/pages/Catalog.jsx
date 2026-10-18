@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { TYPE_LABEL } from '../lib/format.js';
 import { useCatalog } from '../hooks/useCatalog.js';
 import { useSession } from '../hooks/useSession.js';
+import LoadingBlock from '../components/ui/LoadingBlock.jsx';
 import Button from '../components/Button.jsx';
 import ItemGrid from '../components/catalog/ItemGrid.jsx';
 import ImportForm from '../components/catalog/ImportForm.jsx';
@@ -120,7 +121,7 @@ export default function Catalog() {
   // The shopper link is only known right after creation; Retailer.jsx passes it through router state in sessionStorage.
   const links = useMemo(() => { try { return JSON.parse(sessionStorage.getItem(`ensemble.links.${token}`)); } catch { return null; } }, [token]);
 
-  if (phase === 'loading') return <Shell><p role="status" className="text-ink-soft">Loading the catalog…</p></Shell>;
+  if (phase === 'loading') return <Shell><LoadingBlock label="Loading the catalog…" cards={3} /></Shell>;
   if (phase === 'error') {
     return (
       <Shell>

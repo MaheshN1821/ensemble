@@ -106,6 +106,11 @@ const sessionSchema = new mongoose.Schema(
     looks: { type: [look], default: [] },
     renderCache: { type: [renderEntry], default: [] },
     renderRuns: { type: Number, default: 0 }, // stage runs sent to YouCam this session (per-session render cap)
+    // Agent layer (Stage 7): counters for the per-session caps, and items the shopper asked never to see again.
+    agent: {
+      type: new mongoose.Schema({ turns: { type: Number, default: 0 }, llmCalls: { type: Number, default: 0 }, excludeItemIds: { type: [String], default: [] } }, { _id: false }),
+      default: () => ({}),
+    },
     catalogId: { type: String, default: null }, // which catalog the planner uses; null means the sample catalog
     preferences: {
       type: new mongoose.Schema(

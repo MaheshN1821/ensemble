@@ -48,6 +48,17 @@ const schema = z.object({
   // Signs expiring share links. Without it a random secret is made at boot and links stop working after a restart.
   SHARE_SECRET: z.string().min(16, 'must be at least 16 characters').optional(),
 
+  // Agent layer (Stage 7). The language model only reads typed requests into a fixed schema and rephrases planner facts.
+  // Leave LLM_API_KEY empty to run without one: chips and a simple keyword reader still work (FR-28).
+  LLM_PROVIDER: z.enum(['anthropic', 'openai', 'none']).optional(),
+  LLM_API_KEY: z.string().optional(),
+  LLM_MODEL: z.string().trim().max(80).optional(),
+  LLM_BASE_URL: z.string().url().optional().or(z.literal('')),
+  LLM_TIMEOUT_MS: z.coerce.number().int().min(2000).default(12000),
+  AGENT_LLM_EXPLAIN: boolOn,
+  AGENT_SESSION_TURN_CAP: num(40, 1),
+  AGENT_SESSION_LLM_CAP: num(60, 0),
+
   SESSION_TTL_HOURS: num(24, 1),
   SESSION_UNIT_CAP: num(120, 1),
   GLOBAL_DAILY_UNIT_CAP: num(900, 1),
@@ -106,6 +117,18 @@ export function loadEnv(source = process.env) {
       sessionRenderCap: e.SESSION_RENDER_CAP,
     },
     shareSecret: e.SHARE_SECRET || null,
+    agent: {
+      llm: {
+        provider: e.LLM_PROVIDER ?? (e.LLM_API_KEY ? 'anthropic' : 'none'),
+        apiKey: e.LLM_API_KEY || '',
+        model: e.LLM_MODEL || '',
+        baseUrl: e.LLM_BASE_URL || '',
+        timeoutMs: e.LLM_TIMEOUT_MS,
+        explain: e.AGENT_LLM_EXPLAIN,
+      },
+      sessionTurnCap: e.AGENT_SESSION_TURN_CAP,
+      sessionLlmCap: e.AGENT_SESSION_LLM_CAP,
+    },
     sessionTtlHours: e.SESSION_TTL_HOURS,
     sessionUnitCap: e.SESSION_UNIT_CAP,
     globalDailyUnitCap: e.GLOBAL_DAILY_UNIT_CAP,

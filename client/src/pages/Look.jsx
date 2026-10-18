@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useSession } from '../hooks/useSession.js';
 import { useLook } from '../hooks/useLook.js';
+import { useAgentConfig, useAgentTurn, useGovernor } from '../hooks/useAgent.js';
 import { api } from '../lib/api.js';
 import { downloadLook } from '../lib/downloadLook.js';
 import Button from '../components/Button.jsx';
 import LookResult, { ItemList, StageList } from '../components/looks/LookResult.jsx';
 import { ErrorNote } from '../components/intake/fields.jsx';
+import LoadingBlock from '../components/ui/LoadingBlock.jsx';
+import Refine from '../components/agent/Refine.jsx';
+import UnderTheHood from '../components/agent/UnderTheHood.jsx';
 
 const H1 = 'text-[34px] font-light leading-[1.08] tracking-[-0.03em] outline-none sm:text-[44px]';
 
@@ -42,7 +46,7 @@ function Share({ sessionId, lookId }) {
   );
 }
 
-function Ready({ look, sessionId, retry, actionError }) {
+function Ready({ look, sessionId, retry, actionError, agent }) {
   const heading = useRef(null);
   const [downloadError, setDownloadError] = useState(null);
   useEffect(() => { heading.current?.focus({ preventScroll: true }); }, []);
@@ -64,7 +68,9 @@ function Ready({ look, sessionId, retry, actionError }) {
       <div className="mt-8 flex flex-wrap items-start gap-3">
         {look.canRetry && <Button onClick={retry}>Try the missing steps again</Button>}
         {drawn && <Button variant="secondary" onClick={download}>Download as a picture</Button>}
-        <Button to="/looks" variant="secondary">Back to my looks</Button>
+        <Button to="/looks" variant="secondary">Plan other looks</Button>
+        <Button to="/my-looks" variant="secondary">My looks</Button>
+        <Button to={`/compare?a=${look.id}`} variant="secondary">Compare with another look</Button>
       </div>
       <ErrorNote error={actionError} className="mt-4 max-w-xl" />
       <ErrorNote error={downloadError} className="mt-4 max-w-xl" />
@@ -80,6 +86,9 @@ function Ready({ look, sessionId, retry, actionError }) {
           <p className="mt-3 text-[13px] text-ink-soft">Match {look.score} of 100, from the app&apos;s styling rules. It is not a beauty or medical rating.</p>
         </section>
       )}
+
+      <Refine look={look} config={agent.config} turn={agent.result} busy={agent.busy} error={agent.error} onSend={(body) => agent.send(look.id, body)} onNavigate={agent.go} />
+      <UnderTheHood sessionId={sessionId} governor={agent.governor} />
     </div>
   );
 }
@@ -89,9 +98,17 @@ export default function Look() {
   const { session, error: sessionError, retry: retrySession, reset } = useSession();
   const onSessionLost = useCallback(() => reset(), [reset]);
   const l = useLook(session?.sessionId, lookId, { onSessionLost });
+  const navigate = useNavigate();
+  const config = useAgentConfig();
+  const turn = useAgentTurn(session?.sessionId);
+  const gov = useGovernor(session?.sessionId);
+  // Units change when a drawing finishes and when a change is made, so the limits are read again then.
+  const active = Boolean(l.look?.active);
+  useEffect(() => { gov.refresh(); }, [active, turn.result, turn.error]); // eslint-disable-line react-hooks/exhaustive-deps
+  const agent = { config, ...turn, governor: gov.governor, go: (id) => navigate(`/looks/${id}`) };
 
   if (sessionError) return <Shell><h1 className={H1}>We could not start your session</h1><ErrorNote error={sessionError} className="mt-6 max-w-xl" /><div className="mt-8"><Button onClick={retrySession}>Try again</Button></div></Shell>;
-  if (l.phase === 'loading') return <Shell><p role="status" className="text-ink-soft">Loading your look…</p></Shell>;
+  if (l.phase === 'loading') return <Shell><LoadingBlock label="Loading your look…" cards={2} /></Shell>;
   if (l.phase === 'error') {
     const gone = l.error?.code === 'NOT_FOUND';
     return (
@@ -102,5 +119,5 @@ export default function Look() {
       </Shell>
     );
   }
-  return <Shell><Ready look={l.look} sessionId={session.sessionId} retry={l.retry} actionError={l.actionError} /></Shell>;
+  return <Shell><Ready look={l.look} sessionId={session.sessionId} retry={l.retry} actionError={l.actionError} agent={agent} /></Shell>;
 }

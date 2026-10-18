@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, apiUrl } from '../lib/api.js';
 import { TYPE_LABEL, rupees } from '../lib/format.js';
+import LoadingBlock from '../components/ui/LoadingBlock.jsx';
 import Button from '../components/Button.jsx';
 import { ErrorNote } from '../components/intake/fields.jsx';
 
@@ -17,7 +18,7 @@ export default function Shared() {
     return () => { live = false; };
   }, [token]);
 
-  if (state.phase === 'loading') return <section className="mx-auto max-w-4xl px-5 py-16 sm:px-8"><p role="status" className="text-ink-soft">Opening the look…</p></section>;
+  if (state.phase === 'loading') return <section className="mx-auto max-w-4xl px-5 py-16 sm:px-8"><LoadingBlock label="Opening the look…" /></section>;
   if (state.phase === 'error') {
     const gone = state.error?.code === 'SHARE_EXPIRED';
     return (

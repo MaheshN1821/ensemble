@@ -5,6 +5,7 @@ import { useSession } from '../hooks/useSession.js';
 import { usePlan } from '../hooks/usePlan.js';
 import { rupees } from '../lib/format.js';
 import Button from '../components/Button.jsx';
+import LoadingBlock from '../components/ui/LoadingBlock.jsx';
 import LookCard from '../components/looks/LookCard.jsx';
 import { ErrorNote } from '../components/intake/fields.jsx';
 
@@ -103,6 +104,7 @@ function Ready({ plan, constraints, replan, busy, see }) {
       <div className="mt-8 flex flex-wrap items-center gap-3">
         <Button to="/profile" variant="secondary">Back to my colours</Button>
         <Button to="/start?step=details" variant="secondary">Change occasion or budget</Button>
+        <Button to="/my-looks" variant="quiet">My drawn looks</Button>
       </div>
     </div>
   );
@@ -147,7 +149,7 @@ export default function Looks() {
   if (sessionError) {
     return <Shell><h1 className={H1}>We could not start your session</h1><ErrorNote error={sessionError} className="mt-6 max-w-xl" /><div className="mt-8"><Button onClick={retrySession}>Try again</Button></div></Shell>;
   }
-  if (p.phase === 'loading') return <Shell><p role="status" className="text-ink-soft">Planning your looks…</p></Shell>;
+  if (p.phase === 'loading') return <Shell><LoadingBlock label="Planning your looks…" cards={3} /></Shell>;
 
   if (p.phase === 'error') {
     const code = p.error?.code;
