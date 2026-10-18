@@ -17,6 +17,7 @@ export function createMemoryStorage({ configured = true } = {}) {
     readBuffer: async (publicId) => buffers.get(publicId),
     signedUrl: (publicId) => `https://cdn.test/${publicId}?sig=1`,
     deleteAsset: async (publicId) => { assets.delete(publicId); },
+    deleteAssets: async (ids) => { ids.forEach((id) => assets.delete(id)); return { deleted: ids.length }; },
     saveCatalogImage: async ({ catalogId, itemId, buffer }) => {
       const publicId = `ensemble-catalog/${catalogId}/${itemId}`;
       assets.set(publicId, `catalog:${catalogId}`);

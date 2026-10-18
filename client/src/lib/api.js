@@ -1,5 +1,8 @@
 const BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
+/** Absolute address of an API path. Used for images that the browser loads directly (shared looks). */
+export const apiUrl = (path) => `${BASE}${path}`;
+
 export class ApiError extends Error {
   constructor(message, { status, code, requestId } = {}) {
     super(message);

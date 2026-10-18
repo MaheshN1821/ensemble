@@ -8,9 +8,59 @@ const asset = new mongoose.Schema(
     width: Number,
     height: Number,
     bytes: Number,
+    hash: { type: String, default: null }, // SHA-256 of the uploaded bytes: the render cache key (FR-19)
     addedAt: { type: Date, default: Date.now },
   },
   { _id: false },
+);
+
+// One drawn image (Stage 6). The image itself lives in storage; the database keeps only its reference.
+const renderEntry = new mongoose.Schema(
+  {
+    key: { type: String, required: true },
+    stage: String,
+    root: { type: String, enum: ['selfie', 'body'] }, // which photo it was drawn from, so replacing the photo drops it
+    publicId: String,
+    width: Number,
+    height: Number,
+    feature: String,
+    taskId: String,
+    units: Number,
+    at: Date,
+  },
+  { _id: false },
+);
+
+const lookStage = new mongoose.Schema(
+  {
+    status: { type: String, enum: ['idle', 'done', 'failed'], default: 'idle' },
+    key: String,
+    cached: Boolean,
+    units: Number,
+    unitsKnown: Boolean,
+    durationMs: Number,
+    error: { type: new mongoose.Schema({ code: String, message: String, retryable: Boolean }, { _id: false }), default: null },
+    at: Date,
+  },
+  { _id: false },
+);
+
+// A look the shopper chose to see on themselves: which items, and where each stage's result is. Metadata only.
+const look = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    createdAt: Date,
+    updatedAt: Date,
+    snapshot: mongoose.Schema.Types.Mixed, // items (names, prices, product links), score and reasons as planned
+    stages: {
+      outfit: { type: lookStage, default: () => ({}) },
+      earrings: { type: lookStage, default: () => ({}) },
+      necklace: { type: lookStage, default: () => ({}) },
+      lipstick: { type: lookStage, default: () => ({}) },
+    },
+    faceChain: [new mongoose.Schema({ slot: String, key: String }, { _id: false })], // face results in the order they were applied
+  },
+  { _id: false, minimize: false },
 );
 
 // Skin tone reading for the current selfie. Colour numbers and labels only, never the image or face data.
@@ -53,6 +103,9 @@ const sessionSchema = new mongoose.Schema(
       body: { type: asset, default: null },
     },
     skinProfile: { type: skinProfile, default: null },
+    looks: { type: [look], default: [] },
+    renderCache: { type: [renderEntry], default: [] },
+    renderRuns: { type: Number, default: 0 }, // stage runs sent to YouCam this session (per-session render cap)
     catalogId: { type: String, default: null }, // which catalog the planner uses; null means the sample catalog
     preferences: {
       type: new mongoose.Schema(

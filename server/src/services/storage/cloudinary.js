@@ -36,23 +36,36 @@ export function createCloudinaryStorage({ cloudName, apiKey, apiSecret }, logger
       });
     },
 
-    /** Downloads a stored photo so it can be sent to YouCam. Capped so a bad record cannot exhaust memory. */
-    async readBuffer(publicId) {
-      const res = await fetch(this.signedUrl(publicId), { signal: AbortSignal.timeout(20_000) });
+    /**
+     * Downloads a stored photo so it can be sent to YouCam. Capped so a bad record cannot exhaust memory.
+     * `maxSide` asks Cloudinary to shrink the longer side first (never enlarges). The makeup task rejects images of 1920 px or more.
+     */
+    async readBuffer(publicId, { maxSide } = {}) {
+      const res = await fetch(this.signedUrl(publicId, { maxSide }), { signal: AbortSignal.timeout(30_000) });
       if (!res.ok) throw new Error(`Could not read stored photo (${res.status})`);
       const buffer = Buffer.from(await res.arrayBuffer());
       if (buffer.length > 12 * 1024 * 1024) throw new Error('Stored photo is larger than expected');
       return buffer;
     },
 
-    signedUrl(publicId) {
-      return cloudinary.url(publicId, { type: 'authenticated', sign_url: true, secure: true, resource_type: 'image' });
+    signedUrl(publicId, { maxSide } = {}) {
+      const transformation = maxSide ? [{ width: maxSide, height: maxSide, crop: 'limit', quality: 90 }] : undefined;
+      return cloudinary.url(publicId, { type: 'authenticated', sign_url: true, secure: true, resource_type: 'image', ...(transformation ? { transformation } : {}) });
     },
 
     /** Deletes one stored photo. Safe to call for an id that no longer exists. */
     async deleteAsset(publicId) {
       if (!configured || !publicId) return;
       await cloudinary.uploader.destroy(publicId, { type: 'authenticated', resource_type: 'image', invalidate: true });
+    },
+
+    /** Deletes several stored images. Failures are swallowed per image so one bad id cannot block the rest. */
+    async deleteAssets(publicIds = []) {
+      let deleted = 0;
+      for (const id of publicIds) {
+        try { await this.deleteAsset(id); deleted++; } catch (err) { logger?.warn({ err: err.message }, 'asset delete failed'); }
+      }
+      return { deleted };
     },
 
     // ---- Catalog product images (Stage 4). Public delivery type: these are product photos the retailer chose to show. ----

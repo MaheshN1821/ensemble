@@ -26,6 +26,8 @@ services:
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
+      - key: SHARE_SECRET
+        generateValue: true  # signs the 24-hour share links
       - key: SESSION_UNIT_CAP
         value: "120"
       - key: GLOBAL_DAILY_UNIT_CAP

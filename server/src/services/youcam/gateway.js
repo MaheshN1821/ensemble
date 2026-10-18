@@ -1,6 +1,7 @@
 import { AppError } from '../../lib/errors.js';
 import { sleep as defaultSleep, withRetry } from '../../lib/retry.js';
 import { findUnits, parseTask } from './parse.js';
+import { setPath } from '../../lib/objectPath.js';
 
 const COST_TTL_MS = 10 * 60 * 1000;
 const noop = () => {};
@@ -65,6 +66,9 @@ export function createGateway({ client, queue, ledger, storage, config, logger, 
     } catch (err) {
       logger.warn({ feature, err: err.message }, 'could not resolve unit price');
     }
+    // Prices printed in the YouCam docs beat a blind guess. Still flagged as not confirmed (known: false).
+    const documented = config.documentedUnits?.[feature];
+    if (typeof documented === 'number') return { units: documented, known: false };
     return { units: config.unknownFeatureUnits, known: false };
   }
 
@@ -91,6 +95,8 @@ export function createGateway({ client, queue, ledger, storage, config, logger, 
   /**
    * Upload inputs, create the task, poll to completion, optionally copy result images to our storage.
    * `files` entries: { field, buffer, fileName, contentType } or { field, fileId } (to chain a previous result).
+   * One upload may fill several payload fields: { fields: ['src_file_id', 'source_info.name'] }. A field can be a dotted
+   * path, and { path, array: true } (or `asArray: true` with `field`) wraps the id in an array, as the jewellery tasks need.
    */
   async function runTask({ sessionId, requestId = null, feature, files = [], params = {}, storeResult = false, onEvent = noop }) {
     const started = now();
@@ -115,7 +121,12 @@ export function createGateway({ client, queue, ledger, storage, config, logger, 
     try {
       const payload = { ...params };
       for (const f of files) {
-        payload[f.field] = f.fileId ?? (await step('upload_file', () => uploadImage(f)));
+        const id = f.fileId ?? (await step('upload_file', () => uploadImage(f)));
+        const targets = f.fields ?? [{ path: f.field, array: Boolean(f.asArray) }];
+        for (const t of targets) {
+          const spec = typeof t === 'string' ? { path: t, array: false } : t;
+          setPath(payload, spec.path, spec.array ? [id] : id);
+        }
       }
 
       const created = await step('create_task', () =>

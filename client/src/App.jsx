@@ -4,6 +4,8 @@ import Landing from './pages/Landing.jsx';
 import Start from './pages/Start.jsx';
 import Profile from './pages/Profile.jsx';
 import Looks from './pages/Looks.jsx';
+import Look from './pages/Look.jsx';
+import Shared from './pages/Shared.jsx';
 import Catalog from './pages/Catalog.jsx';
 import Retailer from './pages/Retailer.jsx';
 import System from './pages/System.jsx';
@@ -17,6 +19,8 @@ export default function App() {
         <Route path="start" element={<Start />} />
         <Route path="profile" element={<Profile />} />
         <Route path="looks" element={<Looks />} />
+        <Route path="looks/:lookId" element={<Look />} />
+        <Route path="s/:token" element={<Shared />} />
         <Route path="catalog" element={<Catalog />} />
         <Route path="c/:token" element={<Catalog />} />
         <Route path="retailer" element={<Retailer />} />

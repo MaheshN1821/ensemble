@@ -44,3 +44,5 @@ Then add the Vercel URL to `CLIENT_ORIGINS` on Render and redeploy the server.
 ## How looks are planned
 The planner is deterministic and free (no YouCam call, no language model): `server/src/config/planner.js` holds the weights and rules, `server/src/services/planner/` the search. Same inputs always give the same three looks, and the budget is a hard limit. Open `/looks` after the colour profile.
 
+## How looks are drawn
+Choose a look and the server draws it in stages on your own photos through the YouCam API: the outfit on the full-length photo, then earrings, necklace and lipstick on the selfie. Each result is cached, so drawing the same look again costs no units, and a failed step is retried without paying twice. Progress streams live to the look page. Set `SHARE_SECRET` on the server so 24-hour share links survive restarts. Set `PUBLIC_CLIENT_URL` to the client's address so the server can read the sample photos and sample catalog images.

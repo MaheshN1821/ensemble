@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
@@ -68,7 +69,7 @@ export function validatePhoto(kind, buffer) {
   return info;
 }
 
-export function intakeRoutes({ config, sessions, storage, logger }) {
+export function intakeRoutes({ config, sessions, storage, logger, renders }) {
   const router = Router();
   const auth = requireSession(sessions);
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_PHOTO_BYTES, files: 1 } });
@@ -131,13 +132,15 @@ export function intakeRoutes({ config, sessions, storage, logger }) {
       const info = validatePhoto(kind, req.file.buffer);
       const saved = await storage.saveBuffer({ sessionId: s._id, buffer: req.file.buffer, kind });
 
-      const set = { [`photos.${kind}`]: { source: 'upload', publicId: saved.publicId, width: info.width, height: info.height, bytes: req.file.size, addedAt: new Date() } };
+      const hash = createHash('sha256').update(req.file.buffer).digest('hex'); // the render cache key (FR-19)
+      const set = { [`photos.${kind}`]: { source: 'upload', publicId: saved.publicId, width: info.width, height: info.height, bytes: req.file.size, hash, addedAt: new Date() } };
       const unset = [];
       if (kind === 'selfie') unset.push('skinProfile'); // a new selfie means a new reading
       // Never mix a sample photo with a real one.
       const other = kind === 'selfie' ? 'body' : 'selfie';
       const otherAsset = s.photos?.[other];
       if (otherAsset?.source === 'sample') unset.push(`photos.${other}`);
+      const droppedKinds = [kind, ...(otherAsset?.source === 'sample' ? [other] : [])];
 
       let next;
       try {
@@ -153,6 +156,8 @@ export function intakeRoutes({ config, sessions, storage, logger }) {
       // Replace: remove the previous upload only after the new one is safely recorded.
       const old = s.photos?.[kind];
       if (old?.source === 'upload' && old.publicId && old.publicId !== saved.publicId) await storage.deleteAsset(old.publicId).catch((e) => logger.warn({ err: e.message }, 'old photo delete failed'));
+      // Drawings made from a replaced photo are removed. The same photo again keeps its drawings (same hash, same cache keys).
+      if (old?.hash !== hash || droppedKinds.length > 1) await renders?.dropForPhotos(s._id, old?.hash === hash ? droppedKinds.filter((k) => k !== kind) : droppedKinds).catch((e) => logger.warn({ err: e.message }, 'render cleanup failed'));
       res.json(present(next));
     }),
   );
@@ -167,6 +172,7 @@ export function intakeRoutes({ config, sessions, storage, logger }) {
       if (old?.source === 'upload' && old.publicId) await storage.deleteAsset(old.publicId);
       const next = await sessions.patch(req.session._id, { unset: kind === 'selfie' ? [`photos.${kind}`, 'skinProfile'] : [`photos.${kind}`] });
       if (!next) throw new AppError('SESSION_EXPIRED', 'Your session has ended. Start again to continue.', 401);
+      await renders?.dropForPhotos(req.session._id, [kind]).catch((e) => logger.warn({ err: e.message }, 'render cleanup failed'));
       res.json(present(next));
     }),
   );
@@ -193,6 +199,7 @@ export function intakeRoutes({ config, sessions, storage, logger }) {
         unset: ['skinProfile'],
       });
       if (!next) throw new AppError('SESSION_EXPIRED', 'Your session has ended. Start again to continue.', 401);
+      await renders?.dropForPhotos(req.session._id, KINDS).catch((e) => logger.warn({ err: e.message }, 'render cleanup failed'));
       res.json(present(next));
     }),
   );
@@ -218,6 +225,7 @@ export function intakeRoutes({ config, sessions, storage, logger }) {
     auth,
     asyncHandler(async (req, res) => {
       let photosDeleted = 0;
+      renders?.abortSession(req.session._id); // stop any look still being drawn; its images go with the session tag below
       try {
         ({ deleted: photosDeleted } = await storage.deleteSession(req.session._id));
       } catch (err) {

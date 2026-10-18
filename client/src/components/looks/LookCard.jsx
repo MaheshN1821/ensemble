@@ -41,7 +41,9 @@ function Breakdown({ components }) {
   );
 }
 
-export default function LookCard({ look, scoreNote, label, onTryBudget, closest = false }) {
+const SEE_LABEL = { done: 'Open my look', partial: 'Open my look', running: 'See it being drawn', failed: 'Try drawing it again' };
+
+export default function LookCard({ look, scoreNote, label, onTryBudget, closest = false, onSee, seeBusy = false, seeError = null, maxUnits = null, renderedStatus = null }) {
   const items = SLOT_ORDER.map((s) => look.items[s]).filter(Boolean);
   const outfit = look.items.outfit;
   const small = items.filter((i) => i.type !== 'outfit');
@@ -101,6 +103,17 @@ export default function LookCard({ look, scoreNote, label, onTryBudget, closest 
 
         <Breakdown components={look.components} />
         <p className="mt-4 text-[13px] leading-relaxed text-ink-soft">{scoreNote}</p>
+        {onSee && !closest && (
+          <div className="mt-5 border-t border-line pt-5">
+            <button type="button" onClick={onSee} disabled={seeBusy} className="inline-flex h-11 items-center rounded-full bg-rani px-5 text-[15px] font-medium text-white hover:bg-rani-deep disabled:cursor-not-allowed disabled:opacity-50">
+              {seeBusy ? 'Starting…' : SEE_LABEL[renderedStatus] ?? 'See it on me'}
+            </button>
+            <p className="mt-2 text-[13px] leading-relaxed text-ink-soft">
+              {renderedStatus === 'done' ? 'Already drawn, so opening it costs nothing.' : maxUnits ? `Uses up to ${maxUnits} units. Anything already drawn is reused for free.` : 'Anything already drawn is reused for free.'}
+            </p>
+            {seeError && <p role="alert" className="mt-3 rounded-xl bg-alert-wash px-4 py-3 text-[14px] text-alert">{seeError.message}</p>}
+          </div>
+        )}
         {closest && onTryBudget && (
           <div className="mt-5">
             <button type="button" onClick={onTryBudget} className="inline-flex h-11 items-center rounded-full bg-rani px-5 text-[15px] font-medium text-white hover:bg-rani-deep">

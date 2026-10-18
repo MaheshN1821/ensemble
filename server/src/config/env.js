@@ -5,7 +5,14 @@ const bool = z
   .default('false')
   .transform((v) => v === 'true');
 
+const boolOn = z
+  .enum(['true', 'false'])
+  .default('true')
+  .transform((v) => v === 'true');
+
 const num = (def, min = 0) => z.coerce.number().min(min).default(def);
+
+const feature = (def) => z.string().trim().min(1).max(60).regex(/^[a-z0-9][a-z0-9/_-]*$/i, 'must be a YouCam feature path such as cloth-v4').default(def);
 
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -29,6 +36,17 @@ const schema = z.object({
   YOUCAM_TASK_TIMEOUT_MS: z.coerce.number().int().min(5000).default(120000),
   YOUCAM_UNIT_OVERRIDES: z.string().optional(),
   UNKNOWN_FEATURE_UNITS: num(5, 0),
+  // Render pipeline (Stage 6). Feature paths are the part after /s2s/v2.0/task/ in the YouCam docs.
+  YOUCAM_FEATURE_CLOTHES: feature('cloth-v4'),
+  YOUCAM_FEATURE_EARRINGS: feature('2d-vto/earring'),
+  YOUCAM_FEATURE_NECKLACE: feature('2d-vto/necklace'),
+  YOUCAM_FEATURE_MAKEUP: feature('makeup-vto'),
+  // The docs describe the jewellery payload two ways. The server tries the others on a 400 and remembers what worked.
+  YOUCAM_2D_VTO_STYLE: z.enum(['files', 'info', 'both']).default('files'),
+  RENDER_DELETE_TASKS: boolOn,
+  SESSION_RENDER_CAP: num(30, 1),
+  // Signs expiring share links. Without it a random secret is made at boot and links stop working after a restart.
+  SHARE_SECRET: z.string().min(16, 'must be at least 16 characters').optional(),
 
   SESSION_TTL_HOURS: num(24, 1),
   SESSION_UNIT_CAP: num(120, 1),
@@ -81,6 +99,13 @@ export function loadEnv(source = process.env) {
       unitOverrides: parseOverrides(e.YOUCAM_UNIT_OVERRIDES),
       unknownFeatureUnits: e.UNKNOWN_FEATURE_UNITS,
     },
+    render: {
+      features: { outfit: e.YOUCAM_FEATURE_CLOTHES, earrings: e.YOUCAM_FEATURE_EARRINGS, necklace: e.YOUCAM_FEATURE_NECKLACE, lipstick: e.YOUCAM_FEATURE_MAKEUP },
+      vtoStyle: e.YOUCAM_2D_VTO_STYLE,
+      deleteTasks: e.RENDER_DELETE_TASKS,
+      sessionRenderCap: e.SESSION_RENDER_CAP,
+    },
+    shareSecret: e.SHARE_SECRET || null,
     sessionTtlHours: e.SESSION_TTL_HOURS,
     sessionUnitCap: e.SESSION_UNIT_CAP,
     globalDailyUnitCap: e.GLOBAL_DAILY_UNIT_CAP,

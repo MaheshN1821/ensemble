@@ -11,6 +11,8 @@ import { intakeRoutes } from './routes/intake.js';
 import { skinRoutes } from './routes/skin.js';
 import { catalogRoutes } from './routes/catalog.js';
 import { plannerRoutes } from './routes/planner.js';
+import { renderRoutes } from './routes/render.js';
+import { createRenderService } from './services/render/service.js';
 import { createPlannerService } from './services/planner/service.js';
 import { createSkinService } from './services/skin/service.js';
 import { createCatalogService } from './services/catalog/service.js';
@@ -18,6 +20,7 @@ import { createMemoryCatalogRepo } from './services/catalog/repoMemory.js';
 import { createImporter } from './services/catalog/importer.js';
 import { createSafeFetcher } from './lib/safeFetch.js';
 import { LIMITS } from './config/catalog.js';
+import { LIMITS as RENDER_LIMITS } from './config/render.js';
 import { devRoutes } from './routes/dev.js';
 
 // Tests pass their own catalog service; production passes one built over Mongo in index.js. This default keeps
@@ -63,13 +66,19 @@ export function createApp(deps) {
 
   app.use(systemRoutes(deps));
   app.use(sessionRoutes(deps));
-  app.use(intakeRoutes(deps));
+  // Services first: the intake routes tell the render service when a photo changes.
   const skin = deps.skin ?? createSkinService(deps);
-  app.use(skinRoutes({ ...deps, skin }));
   const catalogs = deps.catalogs ?? createDefaultCatalogService(deps);
-  app.use(catalogRoutes({ ...deps, catalogs }));
   const planner = deps.planner ?? createPlannerService({ catalogs, skin });
+  const renders = deps.renders ?? createRenderService({
+    ...deps, catalogs, skin,
+    safeFetcher: createSafeFetcher({ maxBytes: RENDER_LIMITS.garmentMaxBytes, timeoutMs: RENDER_LIMITS.garmentTimeoutMs, maxRedirects: LIMITS.maxRedirects }),
+  });
+  app.use(intakeRoutes({ ...deps, renders }));
+  app.use(skinRoutes({ ...deps, skin }));
+  app.use(catalogRoutes({ ...deps, catalogs }));
   app.use(plannerRoutes({ ...deps, planner }));
+  app.use(renderRoutes({ ...deps, renders }));
   if (config.enableDevRoutes) app.use(devRoutes(deps));
 
   app.use(notFoundHandler);

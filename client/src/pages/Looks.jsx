@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { api } from '../lib/api.js';
 import { useSession } from '../hooks/useSession.js';
 import { usePlan } from '../hooks/usePlan.js';
 import { rupees } from '../lib/format.js';
@@ -35,7 +37,7 @@ function BudgetTry({ plan, constraints, replan, busy }) {
   );
 }
 
-function Ready({ plan, constraints, replan, busy }) {
+function Ready({ plan, constraints, replan, busy, see }) {
   const heading = useRef(null);
   useEffect(() => { heading.current?.focus({ preventScroll: true }); }, []);
   const { profile, occasion, catalog } = plan;
@@ -75,7 +77,13 @@ function Ready({ plan, constraints, replan, busy }) {
 
       {plan.status === 'ok' && (
         <div className="mt-10 grid gap-6 lg:grid-cols-3">
-          {plan.looks.map((l) => <LookCard key={l.id} look={l} label={`Look ${l.rank}`} scoreNote={plan.scoreNote} />)}
+          {plan.looks.map((l) => (
+            <LookCard
+              key={l.id} look={l} label={`Look ${l.rank}`} scoreNote={plan.scoreNote}
+              onSee={() => see.start(l)} seeBusy={see.busyId === l.id} seeError={see.errorId === l.id ? see.error : null}
+              maxUnits={see.maxUnits(l)} renderedStatus={see.statusOf(l.id)}
+            />
+          ))}
         </div>
       )}
 
@@ -107,6 +115,35 @@ export default function Looks() {
   const [busy, setBusy] = useState(false);
   const replan = useCallback(async (c) => { setBusy(true); try { await p.replan(c); } finally { setBusy(false); } }, [p]);
 
+  // Drawing a look on the shopper's photos (Stage 6): what it costs, what is already drawn, and the start action.
+  const navigate = useNavigate();
+  const sessionId = session?.sessionId;
+  const [meta, setMeta] = useState({ config: null, looks: {} });
+  const [seeing, setSeeing] = useState({ busyId: null, errorId: null, error: null });
+  useEffect(() => {
+    if (!sessionId) return undefined;
+    let live = true;
+    Promise.all([api('/api/render/config'), api('/api/sessions/me/looks', { sessionId })])
+      .then(([config, l]) => live && setMeta({ config, looks: Object.fromEntries(l.looks.map((x) => [x.id, x.status])) }))
+      .catch(() => {}); // the buttons still work without the cost hint
+    return () => { live = false; };
+  }, [sessionId]);
+  const see = {
+    ...seeing,
+    statusOf: (id) => meta.looks[id] ?? null,
+    maxUnits: (look) => (meta.config ? meta.config.stages.filter((s) => look.items[s.id]).reduce((n, s) => n + s.units, 0) : null),
+    start: async (look) => {
+      setSeeing({ busyId: look.id, errorId: null, error: null });
+      try {
+        await api('/api/sessions/me/looks', { method: 'POST', sessionId, body: { itemIds: look.itemIds, budgetInr: p.plan?.budgetInr } });
+        navigate(`/looks/${look.id}`);
+      } catch (e) {
+        if (e.code === 'SESSION_EXPIRED') reset();
+        setSeeing({ busyId: null, errorId: look.id, error: e });
+      }
+    },
+  };
+
   if (sessionError) {
     return <Shell><h1 className={H1}>We could not start your session</h1><ErrorNote error={sessionError} className="mt-6 max-w-xl" /><div className="mt-8"><Button onClick={retrySession}>Try again</Button></div></Shell>;
   }
@@ -128,5 +165,5 @@ export default function Looks() {
       </Shell>
     );
   }
-  return <Shell><Ready plan={p.plan} constraints={p.constraints} replan={replan} busy={busy} /></Shell>;
+  return <Shell><Ready plan={p.plan} constraints={p.constraints} replan={replan} busy={busy} see={see} /></Shell>;
 }

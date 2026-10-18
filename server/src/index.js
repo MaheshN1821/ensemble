@@ -14,6 +14,7 @@ import { createCatalogService } from './services/catalog/service.js';
 import { createImporter } from './services/catalog/importer.js';
 import { createSafeFetcher } from './lib/safeFetch.js';
 import { LIMITS } from './config/catalog.js';
+import { DEFAULT_FEATURES, DOCUMENTED_UNITS } from './config/render.js';
 import { createApp } from './app.js';
 
 let config;
@@ -50,6 +51,8 @@ const gateway = createGateway({
   config: {
     unitOverrides: youcam.unitOverrides,
     unknownFeatureUnits: youcam.unknownFeatureUnits,
+    // Prices printed in the YouCam docs, used only when the live price list cannot be matched.
+    documentedUnits: Object.fromEntries(Object.keys(DOCUMENTED_UNITS).map((slot) => [config.render.features[slot] ?? DEFAULT_FEATURES[slot], DOCUMENTED_UNITS[slot]])),
     sessionUnitCap: config.sessionUnitCap,
     globalDailyUnitCap: config.globalDailyUnitCap,
     pollIntervalMs: youcam.pollIntervalMs,
@@ -73,6 +76,8 @@ await catalogs.ensureSample();
 // Merchant catalogs are temporary. Sweep once at boot, then hourly.
 catalogs.sweepExpired().catch((err) => logger.error({ err: err.message }, 'catalog sweep failed'));
 setInterval(() => catalogs.sweepExpired().catch((err) => logger.error({ err: err.message }, 'catalog sweep failed')), 3_600_000).unref();
+
+if (!config.shareSecret) logger.warn('SHARE_SECRET is not set: share links use a random secret and stop working when the server restarts');
 
 const dbStates = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
 const app = createApp({
