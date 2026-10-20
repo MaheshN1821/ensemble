@@ -27,5 +27,17 @@ export function createSessionService({ ttlHours }) {
     async remove(id) {
       await Session.deleteOne({ _id: id });
     },
+    /**
+     * Sets a once-only flag on a live session. True the first time, false after that (atomic, so two requests at once
+     * cannot both win). Used so the retailer counters count a session once.
+     */
+    async markOnce(id, flag) {
+      const res = await Session.updateOne({ ...live(id), counted: { $ne: flag } }, { $addToSet: { counted: flag } });
+      return res.modifiedCount === 1;
+    },
+    /** Sessions past their expiry that still hold data. The sweeper deletes their stored images, then removes them. */
+    async listExpired(limit = 25) {
+      return Session.find({ expiresAt: { $lte: new Date() } }).sort({ expiresAt: 1 }).limit(limit).lean();
+    },
   };
 }

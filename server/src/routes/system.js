@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { asyncHandler } from '../lib/errors.js';
+import { resolveLimits } from '../config/limits.js';
 
-export function systemRoutes({ config, gateway, queue, storage, dbState }) {
+export function systemRoutes({ config, gateway, queue, storage, dbState, purger }) {
   const router = Router();
 
   router.get('/healthz', (_req, res) => {
@@ -17,7 +18,10 @@ export function systemRoutes({ config, gateway, queue, storage, dbState }) {
       youcam: { keyConfigured: Boolean(config.youcam.apiKey), baseUrl: config.youcam.baseUrl },
       storage: { provider: storage.provider, configured: storage.isConfigured() },
       queue: queue.stats(),
-      caps: { sessionUnits: config.sessionUnitCap, globalDailyUnits: config.globalDailyUnitCap },
+      caps: { sessionUnits: config.sessionUnitCap, globalDailyUnits: config.globalDailyUnitCap, sessionRenders: config.render?.sessionRenderCap ?? null },
+      limits: resolveLimits(config.limits),
+      // Expired sessions are deleted (photos, drawn images, YouCam tasks) by a sweeper. These are its own counts, no personal data.
+      privacy: { sweeper: purger?.status?.() ?? null, sessionTtlHours: config.sessionTtlHours ?? null },
       devRoutes: config.enableDevRoutes,
     });
   });

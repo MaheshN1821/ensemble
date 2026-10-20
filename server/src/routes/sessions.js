@@ -1,18 +1,13 @@
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
 import { asyncHandler } from '../lib/errors.js';
 import { requireSession } from '../middleware/session.js';
+import { ipLimiter } from '../lib/ipLimits.js';
+import { resolveLimits } from '../config/limits.js';
 
 export function sessionRoutes({ config, sessions, ledger }) {
   const router = Router();
 
-  const createLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000,
-    limit: 30,
-    standardHeaders: 'draft-7',
-    legacyHeaders: false,
-    message: { error: { code: 'RATE_LIMITED', message: 'Too many sessions from this network. Try again later.' } },
-  });
+  const createLimiter = ipLimiter({ name: 'sessions', windowMs: 3_600_000, limit: resolveLimits(config.limits).sessionsPerHour, message: 'Too many sessions from this network. Try again later.' });
 
   router.post(
     '/api/sessions',

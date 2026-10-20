@@ -51,6 +51,7 @@ const look = new mongoose.Schema(
     id: { type: String, required: true },
     createdAt: Date,
     updatedAt: Date,
+    counted: { type: Boolean, default: false }, // already counted in the retailer view (Stage 9)
     snapshot: mongoose.Schema.Types.Mixed, // items (names, prices, product links), score and reasons as planned
     stages: {
       outfit: { type: lookStage, default: () => ({}) },
@@ -111,6 +112,7 @@ const sessionSchema = new mongoose.Schema(
       type: new mongoose.Schema({ turns: { type: Number, default: 0 }, llmCalls: { type: Number, default: 0 }, excludeItemIds: { type: [String], default: [] } }, { _id: false }),
       default: () => ({}),
     },
+    counted: { type: [String], default: [] }, // once-only retailer-counter flags (Stage 9). Flags only, never content.
     catalogId: { type: String, default: null }, // which catalog the planner uses; null means the sample catalog
     preferences: {
       type: new mongoose.Schema(
@@ -130,7 +132,9 @@ const sessionSchema = new mongoose.Schema(
   },
   { versionKey: false, minimize: false },
 );
-// MongoDB removes the document once expiresAt passes.
-sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// Not a TTL index (Stage 9): Mongo would delete the document before we could remove its images from storage. The sweeper
+// (services/privacy/purge.js) deletes stored images and YouCam tasks first, then the document. Expired sessions are
+// already unreachable: sessions.get() ignores them.
+sessionSchema.index({ expiresAt: 1 });
 
 export const Session = mongoose.models.Session || mongoose.model('Session', sessionSchema);

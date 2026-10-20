@@ -34,3 +34,9 @@ services:
         value: "120"
       - key: GLOBAL_DAILY_UNIT_CAP
         value: "900"
+      - key: SESSION_RENDER_CAP
+        value: "30"
+      - key: SESSION_SWEEP_MINUTES
+        value: "5"
+      - key: PUBLIC_CLIENT_URL
+        sync: false          # the Vercel URL; the server fetches sample photos and catalog images from it

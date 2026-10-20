@@ -13,7 +13,7 @@ export const plannerRules = () => ({
  * Glue between a session and the pure planner: reads the effective skin profile (override applied), the intake
  * preferences and the session's catalog. Spends no YouCam units and calls no language model.
  */
-export function createPlannerService({ catalogs, skin }) {
+export function createPlannerService({ catalogs, skin, metrics }) {
   return {
     rules: plannerRules,
 
@@ -29,6 +29,8 @@ export function createPlannerService({ catalogs, skin }) {
       const kept = session.agent?.excludeItemIds ?? [];
       const merged = kept.length ? { ...constraints, excludeItemIds: [...new Set([...(constraints.excludeItemIds ?? []), ...kept])] } : constraints;
       const plan = planLooks({ items, profile, prefs: session.preferences, constraints: merged });
+      // Retailer counters (FR-29): the session counts once, and so does "nothing within budget". Never delays or fails the plan.
+      metrics?.planned({ _id: session._id, catalogId: catalog.id }, plan);
       return {
         ...plan,
         catalog: { id: catalog.id, name: catalog.name, source: catalog.source, itemCount: catalog.itemCount, fellBack },

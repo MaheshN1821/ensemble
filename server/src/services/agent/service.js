@@ -51,7 +51,7 @@ export function parseTurnBody(body) {
  * validated arguments, no free-form image editing, out-of-scope requests declined with alternatives. Every step is
  * written to the trace as it happens.
  */
-export function createAgentService({ config = {}, logger, sessions, catalogs, skin, renders, ledger, llm, trace = createTraceStore(), now = Date.now }) {
+export function createAgentService({ config = {}, logger, sessions, catalogs, skin, renders, ledger, metrics, llm, trace = createTraceStore(), now = Date.now }) {
   const ac = config.agent ?? {};
   const turnCap = ac.sessionTurnCap ?? LIMITS.defaultSessionTurnCap;
   const llmCap = ac.sessionLlmCap ?? LIMITS.defaultSessionLlmCap;
@@ -242,7 +242,7 @@ export function createAgentService({ config = {}, logger, sessions, catalogs, sk
     // ---- context (free tools) ----
     const profile = effectiveProfile(stored);
     trace.add(sid, { turnId, tool: 'get_profile', input: 'current session', outcome: `${profile.undertone} undertone, ${profile.depth}${stored.override ? ' (adjusted by you)' : ''}` });
-    const { items: catalogItems } = await catalogs.itemsForSession(session);
+    const { items: catalogItems, catalog: usedCatalog } = await catalogs.itemsForSession(session);
     trace.add(sid, { turnId, tool: 'search_catalog', input: 'items for this session', outcome: `${catalogItems.length} items` });
     const byId = new Map(catalogItems.map((i) => [i.id, i]));
     const lookItems = {};
@@ -370,6 +370,13 @@ export function createAgentService({ config = {}, logger, sessions, catalogs, sk
     if (result.prefsPatch.metal) set['preferences.metal'] = result.prefsPatch.metal;
     const saved = await sessions.patch(sid, { set });
     if (!saved) throw new AppError('SESSION_EXPIRED', 'Your session has ended. Start again to continue.', 401);
+    // Retailer counters (FR-29): which kinds of change shoppers ask for. Operation names only, never the typed text.
+    {
+      const counted = result.changes.map((c) => c.op.op);
+      if (result.prefsPatch.budgetInr && !counted.includes('change_budget')) counted.push('change_budget');
+      if (result.unsupported.length) counted.push('unsupported');
+      if (counted.length) metrics?.refined({ catalogId: usedCatalog?.id ?? null }, counted);
+    }
 
     let look = current;
     let renderError = null;

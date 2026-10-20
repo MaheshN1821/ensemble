@@ -42,3 +42,33 @@ export async function api(path, { method = 'GET', body, sessionId, catalogToken,
   }
   return data;
 }
+
+/**
+ * Downloads a file the API returns (the usage CSV). A plain link cannot send the private catalog token header, and the
+ * token must not go in the address, so the file is fetched here and handed to the browser as a download.
+ */
+export async function apiDownload(path, { catalogToken, sessionId, filename = 'download' } = {}) {
+  const headers = {};
+  if (catalogToken) headers['X-Catalog-Token'] = catalogToken;
+  if (sessionId) headers['X-Session-Id'] = sessionId;
+  let res;
+  try {
+    res = await fetch(`${BASE}${path}`, { headers });
+  } catch {
+    throw new ApiError('Could not reach the server. Check your connection and try again.', { code: 'NETWORK' });
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    const e = data?.error;
+    throw new ApiError(e?.message || 'Something went wrong. Try again.', { status: res.status, code: e?.code, requestId: e?.requestId });
+  }
+  const named = /filename="?([^";]+)"?/i.exec(res.headers.get('content-disposition') || '')?.[1];
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = named || filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}

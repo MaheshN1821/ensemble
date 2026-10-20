@@ -15,6 +15,10 @@ import { createImporter } from './services/catalog/importer.js';
 import { createSafeFetcher } from './lib/safeFetch.js';
 import { LIMITS } from './config/catalog.js';
 import { DEFAULT_FEATURES, DOCUMENTED_UNITS } from './config/render.js';
+import { createMetrics } from './services/metrics/service.js';
+import { createMongoStatStore } from './services/metrics/store.js';
+import { createPurger } from './services/privacy/purge.js';
+import { Session } from './models/Session.js';
 import { createApp } from './app.js';
 
 let config;
@@ -27,8 +31,15 @@ try {
 
 const logger = createLogger({ level: config.logLevel, isProd: config.isProd });
 
+// Last-resort logging, so a crash leaves a structured line with a reason instead of a bare stack trace.
+process.on('unhandledRejection', (reason) => logger.error({ err: reason instanceof Error ? reason.message : String(reason) }, 'unhandled promise rejection'));
+process.on('uncaughtException', (err) => { logger.fatal({ err: err.message }, 'uncaught exception'); process.exit(1); });
+
 await mongoose.connect(config.mongoUri, { serverSelectionTimeoutMS: 10_000 });
 logger.info('mongodb connected');
+// Stage 9: sessions are no longer removed by a Mongo TTL index (it would delete the record before the stored images).
+// syncIndexes drops the old TTL index on first boot and builds the plain one.
+await Session.syncIndexes().catch((err) => logger.warn({ err: err.message }, 'session index sync failed'));
 
 const { youcam } = config;
 const queue = new RequestQueue({
@@ -60,6 +71,7 @@ const gateway = createGateway({
   },
 });
 const sessions = createSessionService({ ttlHours: config.sessionTtlHours });
+const metrics = createMetrics({ store: createMongoStatStore(), sessions, logger });
 
 const catalogs = createCatalogService({
   repo: createMongoCatalogRepo(),
@@ -69,6 +81,7 @@ const catalogs = createCatalogService({
     logger,
   }),
   storage,
+  metrics,
   config,
   logger,
 });
@@ -79,16 +92,21 @@ setInterval(() => catalogs.sweepExpired().catch((err) => logger.error({ err: err
 
 if (!config.shareSecret) logger.warn('SHARE_SECRET is not set: share links use a random secret and stop working when the server restarts');
 
+// Expired sessions are deleted here: stored photos and drawn images, YouCam tasks, then the record. At boot, then on a timer.
+const purger = createPurger({ sessions, storage, gateway, ledger, logger, deleteTasks: config.render.deleteTasks });
+
 const dbStates = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
 const app = createApp({
-  config, logger, gateway, ledger, storage, queue, sessions, catalogs,
+  config, logger, gateway, ledger, storage, queue, sessions, catalogs, metrics, purger,
   dbState: () => dbStates[mongoose.connection.readyState] ?? 'unknown',
 });
 
 const server = app.listen(config.port, () => logger.info({ port: config.port, env: config.env }, 'ensemble server listening'));
+purger.start({ intervalMs: config.sessionSweepMinutes * 60_000 });
 
 const shutdown = (signal) => {
   logger.info({ signal }, 'shutting down');
+  purger.stop();
   server.close(async () => {
     await mongoose.disconnect();
     process.exit(0);

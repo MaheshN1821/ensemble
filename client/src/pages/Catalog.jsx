@@ -9,6 +9,7 @@ import Button from '../components/Button.jsx';
 import ItemGrid from '../components/catalog/ItemGrid.jsx';
 import ImportForm from '../components/catalog/ImportForm.jsx';
 import ImportReport from '../components/catalog/ImportReport.jsx';
+import UsagePanel from '../components/catalog/UsagePanel.jsx';
 import { ErrorNote } from '../components/intake/fields.jsx';
 
 const H1 = 'text-[34px] font-light leading-[1.08] tracking-[-0.03em] sm:text-[44px]';
@@ -97,6 +98,8 @@ function OwnerPanel({ token, catalog, apply, links }) {
         <p className="mt-4 text-[14px] text-ink-soft">Catalogs are temporary: this one is removed on {new Date(catalog.expiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}. Importing or editing extends it.</p>
       </section>
 
+      <UsagePanel token={token} />
+
       <section className="rounded-2xl border border-line bg-paper p-5 sm:p-6" aria-labelledby="add-title">
         <h2 id="add-title" className="text-[20px] font-medium tracking-[-0.02em]">Add or replace items</h2>
         <p className="mb-5 mt-2 text-[15px] text-ink-soft">
@@ -159,6 +162,7 @@ export default function Catalog() {
 
       {!owner && catalog.source === 'merchant' && <UseCatalog token={token} name={catalog.name} />}
       {owner && <OwnerPanel token={token} catalog={catalog} apply={apply} links={links} />}
+      {catalog.source === 'sample' && <div className="mt-8"><UsagePanel token={null} /></div>}
 
       <div className="mt-10 flex flex-wrap gap-2" role="group" aria-label="Filter by item type">
         {TYPES.map((t) => (

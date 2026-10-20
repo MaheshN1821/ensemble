@@ -59,6 +59,18 @@ const schema = z.object({
   AGENT_SESSION_TURN_CAP: num(40, 1),
   AGENT_SESSION_LLM_CAP: num(60, 0),
 
+  // Per-IP limits (Stage 9). 0 turns a limit off.
+  LIMIT_REQUESTS_PER_MINUTE: num(120, 0),
+  LIMIT_SESSIONS_PER_HOUR: num(30, 0),
+  LIMIT_UPLOADS_PER_HOUR: num(40, 0),
+  LIMIT_SKIN_PER_HOUR: num(12, 0),
+  LIMIT_RENDERS_PER_HOUR: num(24, 0),
+  LIMIT_AGENT_TURNS_PER_HOUR: num(60, 0),
+  LIMIT_SHARE_VIEWS_PER_MINUTE: num(90, 0),
+  LIMIT_STATS_PER_MINUTE: num(30, 0),
+  // How often expired sessions are swept (stored photos, drawn images and YouCam tasks deleted), in minutes.
+  SESSION_SWEEP_MINUTES: num(5, 1),
+
   SESSION_TTL_HOURS: num(24, 1),
   SESSION_UNIT_CAP: num(120, 1),
   GLOBAL_DAILY_UNIT_CAP: num(900, 1),
@@ -129,6 +141,17 @@ export function loadEnv(source = process.env) {
       sessionTurnCap: e.AGENT_SESSION_TURN_CAP,
       sessionLlmCap: e.AGENT_SESSION_LLM_CAP,
     },
+    limits: {
+      requestsPerMinute: e.LIMIT_REQUESTS_PER_MINUTE,
+      sessionsPerHour: e.LIMIT_SESSIONS_PER_HOUR,
+      uploadsPerHour: e.LIMIT_UPLOADS_PER_HOUR,
+      skinPerHour: e.LIMIT_SKIN_PER_HOUR,
+      rendersPerHour: e.LIMIT_RENDERS_PER_HOUR,
+      agentTurnsPerHour: e.LIMIT_AGENT_TURNS_PER_HOUR,
+      shareViewsPerMinute: e.LIMIT_SHARE_VIEWS_PER_MINUTE,
+      statsPerMinute: e.LIMIT_STATS_PER_MINUTE,
+    },
+    sessionSweepMinutes: e.SESSION_SWEEP_MINUTES,
     sessionTtlHours: e.SESSION_TTL_HOURS,
     sessionUnitCap: e.SESSION_UNIT_CAP,
     globalDailyUnitCap: e.GLOBAL_DAILY_UNIT_CAP,

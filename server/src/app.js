@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import pinoHttp from 'pino-http';
 import { requestId } from './middleware/requestId.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
@@ -25,6 +24,12 @@ import { createSafeFetcher } from './lib/safeFetch.js';
 import { LIMITS } from './config/catalog.js';
 import { LIMITS as RENDER_LIMITS } from './config/render.js';
 import { devRoutes } from './routes/dev.js';
+import { statsRoutes } from './routes/stats.js';
+import { createMetrics } from './services/metrics/service.js';
+import { createMemoryStatStore } from './services/metrics/storeMemory.js';
+import { createPurger } from './services/privacy/purge.js';
+import { createLimiters } from './lib/ipLimits.js';
+import { maskUrl, shortId } from './lib/logIds.js';
 
 // Tests pass their own catalog service; production passes one built over Mongo in index.js. This default keeps
 // createApp usable with the older dependency set (in-memory repository, real image fetcher).
@@ -41,7 +46,20 @@ export function createApp(deps) {
   app.disable('x-powered-by');
 
   app.use(requestId);
-  app.use(pinoHttp({ logger, genReqId: (req) => req.id, autoLogging: { ignore: (req) => req.url === '/healthz' } }));
+  app.use(
+    pinoHttp({
+      logger,
+      genReqId: (req) => req.id,
+      autoLogging: { ignore: (req) => req.url === '/healthz' },
+      // Tokens in the path (share links) are masked, the session is logged as a one-way fingerprint, and failures stand out.
+      serializers: {
+        req: (req) => ({ id: req.id, method: req.method, url: maskUrl(req.url) }),
+        res: (res) => ({ statusCode: res.statusCode }),
+      },
+      customProps: (req) => (req.session?._id ? { sid: shortId(req.session._id) } : {}),
+      customLogLevel: (_req, res, err) => (err || res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info'),
+    }),
+  );
   app.use(helmet());
   app.use(
     cors({
@@ -56,34 +74,41 @@ export function createApp(deps) {
     }),
   );
   app.use(express.json({ limit: '100kb' }));
-  app.use(
-    '/api',
-    rateLimit({
-      windowMs: 60_000,
-      limit: 120,
-      standardHeaders: 'draft-7',
-      legacyHeaders: false,
-      message: { error: { code: 'RATE_LIMITED', message: 'Too many requests. Slow down for a moment.' } },
-    }),
-  );
+  const limiters = createLimiters({ config, logger });
+  app.use('/api', limiters.global);
+  // Per-IP limits on the routes that cost something (storage, YouCam units, the language model). Each runs before the route.
+  app.put('/api/sessions/me/photos/:kind', limiters.uploads);
+  app.post('/api/sessions/me/skin-profile', limiters.skin);
+  app.post('/api/sessions/me/looks', limiters.renders);
+  app.post('/api/sessions/me/looks/:lookId/render', limiters.renders);
+  app.post('/api/sessions/me/agent/turn', limiters.agent);
+  app.use('/api/share', limiters.share);
+  app.use(['/api/catalogs/mine/stats', '/api/catalogs/mine/stats.csv', '/api/catalog/sample/stats', '/api/catalog/sample/stats.csv'], limiters.stats);
 
-  app.use(systemRoutes(deps));
   app.use(sessionRoutes(deps));
   // Services first: the intake routes tell the render service when a photo changes.
   const skin = deps.skin ?? createSkinService(deps);
   const catalogs = deps.catalogs ?? createDefaultCatalogService(deps);
-  const planner = deps.planner ?? createPlannerService({ catalogs, skin });
+  const metrics = deps.metrics ?? createMetrics({ store: createMemoryStatStore(), sessions: deps.sessions, logger });
+  const planner = deps.planner ?? createPlannerService({ catalogs, skin, metrics });
   const renders = deps.renders ?? createRenderService({
-    ...deps, catalogs, skin,
+    ...deps, catalogs, skin, metrics,
     safeFetcher: createSafeFetcher({ maxBytes: RENDER_LIMITS.garmentMaxBytes, timeoutMs: RENDER_LIMITS.garmentTimeoutMs, maxRedirects: LIMITS.maxRedirects }),
   });
   const agent = deps.agent ?? createAgentService({
-    config, logger, sessions: deps.sessions, catalogs, skin, renders, ledger: deps.ledger,
+    config, logger, sessions: deps.sessions, catalogs, skin, renders, ledger: deps.ledger, metrics,
     llm: deps.llm ?? createLlm({ config: config.agent?.llm, logger }),
   });
-  app.use(intakeRoutes({ ...deps, renders, agent }));
+  const purger = deps.purger ?? createPurger({
+    sessions: deps.sessions, storage: deps.storage, gateway: deps.gateway, ledger: deps.ledger, renders, agent, logger,
+    deleteTasks: config.render?.deleteTasks !== false,
+  });
+  purger.attach({ renders, agent });
+  app.use(systemRoutes({ ...deps, purger }));
+  app.use(intakeRoutes({ ...deps, renders, agent, purger }));
   app.use(skinRoutes({ ...deps, skin }));
-  app.use(catalogRoutes({ ...deps, catalogs }));
+  app.use(catalogRoutes({ ...deps, catalogs, metrics }));
+  app.use(statsRoutes({ ...deps, catalogs, metrics }));
   app.use(plannerRoutes({ ...deps, planner }));
   app.use(renderRoutes({ ...deps, renders }));
   app.use(agentRoutes({ ...deps, agent }));

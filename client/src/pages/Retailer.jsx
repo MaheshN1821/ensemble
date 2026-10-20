@@ -58,7 +58,7 @@ export default function Retailer() {
         <div className="mt-8 space-y-6">
           <section className="rounded-2xl border border-peacock bg-peacock-wash p-5 sm:p-6" aria-labelledby="done-title">
             <h2 id="done-title" className="text-[22px] font-medium tracking-[-0.02em]">✓ {result.catalog.name} is live with {result.catalog.itemCount} items</h2>
-            <p className="mt-2 max-w-[60ch] text-[15px] leading-relaxed">Save both links now. We store only a fingerprint of them, so we cannot show them again or recover them.</p>
+            <p className="mt-2 max-w-[60ch] text-[15px] leading-relaxed">Save both links now. We store only a fingerprint of them, so we cannot show them again or recover them. Your manage link also opens a usage view with anonymous counts once shoppers use your catalog.</p>
             <dl className="mt-5 space-y-4 text-[14px]">
               <div><dt className="text-ink-soft">Manage link (private, keep it to yourself)</dt><dd className="mt-1 break-all font-mono">{origin}/c/{result.tokens.manage}</dd></div>
               <div><dt className="text-ink-soft">Shopper link (share this with customers)</dt><dd className="mt-1 break-all font-mono">{origin}/c/{result.tokens.share}</dd></div>
@@ -74,7 +74,7 @@ export default function Retailer() {
       {report && <div className="mt-6"><ImportReport report={report} /></div>}
 
       <p className="mt-10 text-[14px] text-ink-soft">
-        Want to see what shoppers see first? <Link to="/catalog" className="text-rani underline underline-offset-4">Browse the sample catalog</Link>. Catalogs are removed 30 days after the last change.
+        Want to see what shoppers see first? <Link to="/catalog" className="text-rani underline underline-offset-4">Browse the sample catalog</Link>, which also shows the usage numbers a retailer sees. Catalogs are removed 30 days after the last change.
       </p>
     </section>
   );

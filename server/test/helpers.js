@@ -125,6 +125,15 @@ export function createMemorySessions(ids = ['sess-1']) {
       return structuredClone(d);
     },
     remove: async (id) => { docs.delete(id); },
+    markOnce: async (id, flag) => {
+      const d = docs.get(id);
+      if (!d || new Date(d.expiresAt) <= new Date()) return false;
+      d.counted ??= [];
+      if (d.counted.includes(flag)) return false;
+      d.counted.push(flag);
+      return true;
+    },
+    listExpired: async (limit = 25) => [...docs.values()].filter((d) => new Date(d.expiresAt) <= new Date()).slice(0, limit).map((d) => structuredClone(d)),
   };
 }
 

@@ -38,7 +38,7 @@ const jpegOrPng = (info) => (info.format === 'png' ? { contentType: 'image/png',
  * The database holds metadata only: which items, which stage finished, and where the result is stored.
  */
 export function createRenderService({
-  gateway, storage, sessions, catalogs, skin, ledger, config = {}, logger,
+  gateway, storage, sessions, catalogs, skin, ledger, metrics, config = {}, logger,
   fetchOwn, safeFetcher, now = Date.now,
 }) {
   const rc = config.render ?? {};
@@ -202,6 +202,8 @@ export function createRenderService({
     });
     if (!res.ok) { sessionLost(job); await deleteAssets([entry.publicId]); return; }
     job.cache.set(key, entry);
+    // Retailer counters: units drawn on this catalog, and the first paid stage of a look marks it as drawn.
+    if (!cached && units > 0) { metrics?.unitsSpent({ catalogId: job.catalogId }, { units, firstForLook: !job.paidStage }); job.paidStage = true; }
     job.record.stages = { ...(job.record.stages ?? {}), [stage]: stageRecord };
     if (isFace) job.record.faceChain = [...(job.record.faceChain ?? []).filter((c) => c.slot !== stage), { slot: stage, key }];
     delete job.live[stage];
@@ -367,7 +369,7 @@ export function createRenderService({
     const stored = skin.current(session);
     if (!stored) throw new AppError('NO_PROFILE', 'Read your skin tone first, then we can plan looks to match it.', 409);
 
-    const { items } = await catalogs.itemsForSession(session);
+    const { items, catalog } = await catalogs.itemsForSession(session);
     const byId = new Map(items.map((i) => [i.id, i]));
     const chosen = {};
     for (const id of new Set(itemIds)) {
@@ -386,7 +388,7 @@ export function createRenderService({
       const money = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
       throw new AppError('OVER_BUDGET', `This look costs ${money(look.totalPrice)}, which is ${money(look.overBy)} over your budget of ${money(look.budgetInr)}.`, 409, { overBy: look.overBy });
     }
-    return look;
+    return { look, catalogId: catalog?.id ?? null };
   }
 
   function gate(session) {
@@ -458,7 +460,7 @@ export function createRenderService({
     const sid = session._id;
     return withLock(`start:${sid}`, async () => {
       gate(session);
-      const look = await lookFromInput(session, input);
+      const { look, catalogId } = await lookFromInput(session, input);
       const lookId = look.id;
 
       const running = jobs.get(jobKey(sid, lookId));
@@ -483,7 +485,6 @@ export function createRenderService({
       });
       if (!saved.ok) throw sessionGone();
       await deleteAssets(evicted);
-
       const fresh = await sessions.get(sid);
       if (!fresh) throw sessionGone();
       const record = recordOf(fresh, lookId);
@@ -492,9 +493,16 @@ export function createRenderService({
       const toRun = Object.entries(hits).filter(([, hit]) => !hit).map(([slot]) => slot);
       if (toRun.length) await assertCapacity(fresh, toRun);
 
+      // Retailer counters (FR-29): a look counts once, when it is really going to be drawn. One refused by a cap does not count,
+      // and a retry of the same look does not count twice (the record carries a flag).
+      if (!record.counted) {
+        const marked = await mutate(sid, (draft) => { const r = draft.looks.find((l) => l.id === lookId); if (r) r.counted = true; });
+        if (marked.ok) { record.counted = true; metrics?.lookStarted({ catalogId }, look.items); }
+      }
+
       const job = {
         sessionId: sid, lookId, requestId: input?.requestId ?? null, items: look.items, photos: { selfie: fresh.photos.selfie, body: fresh.photos.body },
-        sampleModel: fresh.photos.selfie.source === 'sample',
+        sampleModel: fresh.photos.selfie.source === 'sample', catalogId, paidStage: false,
         record: structuredClone(record), cache: cacheByKey, live: {}, listeners: new Set(), events: [], aborted: false, finished: false, startedAt: now(),
       };
       for (const d of STAGES) {

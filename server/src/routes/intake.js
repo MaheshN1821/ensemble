@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { AppError, asyncHandler } from '../lib/errors.js';
 import { readImageInfo } from '../lib/imageInfo.js';
 import { requireSession } from '../middleware/session.js';
+import { shortId } from '../lib/logIds.js';
 import {
   AVOID_COLOURS, BUDGET, CONSENT_VERSION, MAX_PHOTO_BYTES, METALS, NOTES_MAX, OCCASIONS, OCCASION_TEXT_MAX,
   PHOTO_RULES, SAMPLE_MODELS, SILHOUETTES, publicIntakeConfig,
@@ -69,7 +70,7 @@ export function validatePhoto(kind, buffer) {
   return info;
 }
 
-export function intakeRoutes({ config, sessions, storage, logger, renders, agent }) {
+export function intakeRoutes({ config, sessions, storage, logger, renders, agent, purger }) {
   const router = Router();
   const auth = requireSession(sessions);
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_PHOTO_BYTES, files: 1 } });
@@ -219,21 +220,20 @@ export function intakeRoutes({ config, sessions, storage, logger, renders, agent
     }),
   );
 
-  // Delete everything: photos in storage first (so a failure leaves the session, and a retry possible), then the session.
+  // Delete everything: stored photos and drawn images first (so a failure leaves the session, and a retry possible), then the
+  // session. YouCam's copies of finished tasks are deleted too, in the background so the button does not wait on them.
   router.delete(
     '/api/sessions/me',
     auth,
     asyncHandler(async (req, res) => {
       let photosDeleted = 0;
-      renders?.abortSession(req.session._id); // stop any look still being drawn; its images go with the session tag below
       try {
-        ({ deleted: photosDeleted } = await storage.deleteSession(req.session._id));
+        ({ files: photosDeleted } = await purger.purge(req.session, { tasks: 'background' }));
       } catch (err) {
-        logger.error({ err: err.message, sessionId: req.session._id }, 'session photo delete failed');
+        logger.error({ err: err.message, sid: shortId(req.session._id) }, 'session photo delete failed');
         throw new AppError('DELETE_FAILED', 'We could not remove your photos just now. Nothing was lost. Try again in a moment.', 502);
       }
       await sessions.remove(req.session._id);
-      agent?.forget(req.session._id); // the trace holds step names only, but it goes with everything else (FR-32)
       res.json({ deleted: true, photosDeleted });
     }),
   );

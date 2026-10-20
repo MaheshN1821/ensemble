@@ -50,6 +50,11 @@ export function createMongoLedger() {
     async list(sessionId, limit = 50) {
       return LedgerEntry.find({ sessionId }).sort({ createdAt: -1 }).limit(limit).lean();
     },
+    /** Task ids YouCam has already been asked to delete (successfully) for this session. */
+    async deletedTaskIds(sessionId) {
+      const rows = await LedgerEntry.find({ sessionId, kind: 'task-delete', success: true }, { taskId: 1 }).lean();
+      return new Set(rows.map((r) => r.taskId).filter(Boolean));
+    },
   };
 }
 
@@ -72,6 +77,9 @@ export function createMemoryLedger() {
     },
     async list(sessionId, limit = 50) {
       return rows.filter((r) => r.sessionId === sessionId).slice(-limit).reverse();
+    },
+    async deletedTaskIds(sessionId) {
+      return new Set(rows.filter((r) => r.sessionId === sessionId && r.kind === 'task-delete' && r.success).map((r) => r.taskId));
     },
   };
 }

@@ -8,7 +8,7 @@ const newToken = (prefix) => `${prefix}_${randomBytes(24).toString('base64url')}
 const newId = () => randomBytes(9).toString('base64url');
 const NOT_FOUND = () => new AppError('CATALOG_NOT_FOUND', 'That catalog link does not work. It may have expired or been deleted. Check the link or ask the retailer for a new one.', 404);
 
-export function createCatalogService({ repo, importer, storage, config = {}, logger, now = () => new Date() }) {
+export function createCatalogService({ repo, importer, storage, metrics, config = {}, logger, now = () => new Date() }) {
   const ttlMs = (config.catalogTtlDays ?? LIMITS.catalogTtlDays) * 86_400_000;
   const publicBase = (config.publicClientUrl ?? '').replace(/\/$/, '');
 
@@ -82,6 +82,12 @@ export function createCatalogService({ repo, importer, storage, config = {}, log
 
     async open(token) {
       const { catalog, role } = await resolve(token);
+      return withItems(catalog, role);
+    },
+
+    /** Like open, but only the manage link works. Used by the retailer view. */
+    async openOwned(token) {
+      const { catalog, role } = await resolve(token, { need: 'manage' });
       return withItems(catalog, role);
     },
 
@@ -192,5 +198,6 @@ export function createCatalogService({ repo, importer, storage, config = {}, log
     await storage?.deleteCatalog?.(catalogId);
     await repo.deleteItems(catalogId);
     await repo.deleteCatalog(catalogId);
+    await metrics?.deleteCatalog(catalogId); // its usage counters go with it
   }
 }
