@@ -50,7 +50,10 @@ export function createSafeFetcher({ maxBytes, timeoutMs, maxRedirects = 3, allow
 
     return new Promise((resolve, reject) => {
       const req = mod.get(u, {
-        lookup: (_h, _o, cb) => cb(null, pinned.address, pinned.family),
+        lookup: (_h, options, cb) => {
+          if (options.all) return cb(null, [pinned]);
+          return cb(null, pinned.address, pinned.family);
+        },
         headers: { 'User-Agent': 'EnsembleCatalogImport/1.0', Accept: 'image/jpeg,image/png' },
         timeout: timeoutMs,
       }, (res) => {
