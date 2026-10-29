@@ -10,6 +10,8 @@ export const DEFAULT_LIMITS = {
   agentTurnsPerHour: 60,    // typed or chip refinements
   shareViewsPerMinute: 90,  // public share-link views
   statsPerMinute: 30,       // retailer view and CSV export
+  loginsPer15Min: 20,       // sign-in attempts, per IP (a per-account throttle sits on top, in the auth service)
+  registrationsPerHour: 10, // new accounts, per IP
 };
 
 export function resolveLimits(partial = {}) {

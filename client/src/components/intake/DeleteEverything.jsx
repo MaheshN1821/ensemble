@@ -24,13 +24,13 @@ export default function DeleteEverything({ onDelete }) {
       {!confirming ? (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <Button variant="quiet" className="px-0" onClick={() => setConfirming(true)}>Delete my photos and data</Button>
-          <p className="text-sm text-ink-soft">Removes everything from this session straight away.</p>
+          <p className="text-sm text-ink-soft">Removes everything saved for you straight away, including your saved looks if you have an account.</p>
         </div>
       ) : (
         <div role="alertdialog" aria-labelledby="del-title" aria-describedby="del-body" className="max-w-lg rounded-2xl border border-line bg-paper p-6">
           <h2 id="del-title" className="text-[19px] font-medium">Delete everything now?</h2>
           <p id="del-body" className="mt-2 text-[15px] leading-relaxed text-ink-soft">
-            Your photos, answers and consent are removed from our storage. You will start again from the beginning. This cannot be undone.
+            Your photos, answers, skin reading and looks are removed from our storage. You will start again from the beginning. Your account, if you have one, stays. This cannot be undone.
           </p>
           <ErrorNote error={error} className="mt-4" />
           <div className="mt-5 flex flex-wrap gap-3">

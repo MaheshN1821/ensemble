@@ -98,43 +98,4 @@ export function fakePng(width, height) {
   return b;
 }
 
-/** In-memory stand-ins so intake routes can be tested without Mongo or Cloudinary. */
-export function createMemorySessions(ids = ['sess-1']) {
-  const docs = new Map(ids.map((id) => [id, { _id: id, expiresAt: new Date(Date.now() + 3_600_000), photos: {} }]));
-  const setPath = (obj, path, value) => {
-    const keys = path.split('.');
-    let o = obj;
-    keys.slice(0, -1).forEach((k) => { o[k] ??= {}; o = o[k]; });
-    o[keys.at(-1)] = value;
-  };
-  const unsetPath = (obj, path) => {
-    const keys = path.split('.');
-    let o = obj;
-    for (const k of keys.slice(0, -1)) { o = o?.[k]; if (!o) return; }
-    delete o[keys.at(-1)];
-  };
-  return {
-    docs,
-    create: async () => ({ id: 'sess-1', expiresAt: new Date(Date.now() + 1000) }),
-    get: async (id) => (docs.has(id) ? structuredClone(docs.get(id)) : null),
-    patch: async (id, { set = {}, unset = [] } = {}) => {
-      const d = docs.get(id);
-      if (!d) return null;
-      Object.entries(set).forEach(([k, v]) => setPath(d, k, v));
-      unset.forEach((k) => unsetPath(d, k));
-      return structuredClone(d);
-    },
-    remove: async (id) => { docs.delete(id); },
-    markOnce: async (id, flag) => {
-      const d = docs.get(id);
-      if (!d || new Date(d.expiresAt) <= new Date()) return false;
-      d.counted ??= [];
-      if (d.counted.includes(flag)) return false;
-      d.counted.push(flag);
-      return true;
-    },
-    listExpired: async (limit = 25) => [...docs.values()].filter((d) => new Date(d.expiresAt) <= new Date()).slice(0, limit).map((d) => structuredClone(d)),
-  };
-}
-
-export { createMemoryStorage } from './fakes.js';
+export { createMemoryStorage, createMemorySessions } from './fakes.js';

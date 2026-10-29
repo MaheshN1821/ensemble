@@ -21,6 +21,10 @@ export function createMemoryStatStore({ now = () => new Date() } = {}) {
     async delete(catalogId) {
       docs.delete(catalogId);
     },
+    async unsetPicks(catalogId, keys) {
+      const doc = docs.get(catalogId);
+      if (doc?.itemPicks) for (const k of keys ?? []) delete doc.itemPicks[k];
+    },
   };
 }
 

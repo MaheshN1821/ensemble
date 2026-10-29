@@ -5,7 +5,7 @@ import { Checkbox, ErrorNote } from './fields.jsx';
 const facts = [
   { title: 'What we collect', body: 'A selfie and a full-length photo, plus the occasion, budget and preferences you enter. No name, email or account.' },
   { title: 'Who sees the photos', body: 'They are sent to the YouCam API (Perfect Corp) to read your skin tone and draw the look on you. We do not use them for anything else.' },
-  { title: 'How long they stay', body: 'Deleted within 24 hours, or the moment you press "Delete my photos and data". Photos are never stored in our database.' },
+  { title: 'How long they stay', body: 'Deleted within 24 hours, or the moment you press "Delete my photos and data". If you create an optional account, they are kept in it until you delete them. Photos are never stored in our database.' },
 ];
 
 export default function Consent({ initial, onAccept }) {

@@ -1,8 +1,11 @@
 import { randomBytes } from 'node:crypto';
 import { Session } from '../models/Session.js';
 
-export function createSessionService({ ttlHours }) {
+const DAY = 86_400_000;
+
+export function createSessionService({ ttlHours, accountDays = 365 }) {
   const live = (id) => ({ _id: id, expiresAt: { $gt: new Date() } });
+  const accountExpiry = () => new Date(Date.now() + accountDays * DAY);
   return {
     async create() {
       const id = randomBytes(18).toString('base64url');
@@ -12,7 +15,46 @@ export function createSessionService({ ttlHours }) {
     },
     async get(id) {
       if (!id || typeof id !== 'string' || id.length > 64) return null;
-      return Session.findOne(live(id)).lean();
+      const doc = await Session.findOne(live(id)).lean();
+      // A signed-in shopper's session lasts months, but the spending counters are per day: reset them once a day.
+      if (doc?.accountId && (!doc.capsResetAt || Date.now() - new Date(doc.capsResetAt).getTime() > DAY)) {
+        const fresh = await Session.findOneAndUpdate(
+          live(id),
+          { $set: { capsResetAt: new Date(), renderRuns: 0, 'agent.turns': 0, 'agent.llmCalls': 0 } },
+          { new: true },
+        ).lean();
+        return fresh ?? doc;
+      }
+      return doc;
+    },
+
+    // ---- Accounts ----
+    async findByAccount(accountId) {
+      return Session.findOne({ accountId, expiresAt: { $gt: new Date() } }).lean();
+    },
+    async createForAccount(accountId) {
+      const id = randomBytes(18).toString('base64url');
+      const expiresAt = accountExpiry();
+      await Session.create({ _id: id, expiresAt, accountId, capsResetAt: new Date() });
+      return { id, expiresAt };
+    },
+    /** Makes an anonymous session the account's own, keeping everything in it. Null if it expired or belongs to someone else. */
+    async adoptForAccount(id, accountId) {
+      if (!id || typeof id !== 'string' || id.length > 64) return null;
+      return Session.findOneAndUpdate(
+        { ...live(id), accountId: null },
+        { $set: { accountId, expiresAt: accountExpiry(), capsResetAt: new Date() } },
+        { new: true },
+      ).lean();
+    },
+    /** Each visit pushes the expiry out again, so a session only lapses after a long time away. */
+    async extendForAccount(id) {
+      return Session.findOneAndUpdate(live(id), { $set: { expiresAt: accountExpiry() } }, { new: true }).lean();
+    },
+    /** A retailer deleted items: shoppers who had asked never to see them no longer need that entry. */
+    async dropExcludedItems(itemIds) {
+      if (!itemIds?.length) return;
+      await Session.updateMany({ 'agent.excludeItemIds': { $in: itemIds } }, { $pull: { 'agent.excludeItemIds': { $in: itemIds } } });
     },
     /**
      * Sets and unsets dotted fields on a live session, e.g. { set: { 'photos.selfie': {...} }, unset: ['preferences'] }.

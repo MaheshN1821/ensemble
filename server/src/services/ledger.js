@@ -31,6 +31,11 @@ const startOfUtcDay = () => {
   return d;
 };
 
+// The per-session unit cap counts the last 24 hours. A day-long anonymous session is unaffected; a signed-in shopper's
+// session lasts months, and the cap should be a daily allowance rather than a lifetime one.
+export const SESSION_CAP_WINDOW_MS = 24 * 3_600_000;
+const windowStart = () => new Date(Date.now() - SESSION_CAP_WINDOW_MS);
+
 const sumUnits = async (match) => {
   const [row] = await LedgerEntry.aggregate([
     { $match: { ...match, success: true } },
@@ -45,7 +50,7 @@ export function createMongoLedger() {
       const doc = await LedgerEntry.create(entry);
       return doc.toObject();
     },
-    sessionUnits: (sessionId) => sumUnits({ sessionId }),
+    sessionUnits: (sessionId) => sumUnits({ sessionId, createdAt: { $gte: windowStart() } }),
     dailyUnits: () => sumUnits({ createdAt: { $gte: startOfUtcDay() } }),
     async list(sessionId, limit = 50) {
       return LedgerEntry.find({ sessionId }).sort({ createdAt: -1 }).limit(limit).lean();
@@ -69,7 +74,8 @@ export function createMemoryLedger() {
       return row;
     },
     async sessionUnits(sessionId) {
-      return rows.filter((r) => r.sessionId === sessionId && r.success).reduce((s, r) => s + r.units, 0);
+      const from = windowStart();
+      return rows.filter((r) => r.sessionId === sessionId && r.success && r.createdAt >= from).reduce((s, r) => s + r.units, 0);
     },
     async dailyUnits() {
       const from = startOfUtcDay();

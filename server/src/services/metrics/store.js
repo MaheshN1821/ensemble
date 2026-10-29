@@ -21,5 +21,10 @@ export function createMongoStatStore() {
     async delete(catalogId) {
       await CatalogStat.deleteOne({ _id: catalogId });
     },
+    /** Removes item counters. `keys` are already encoded (see config/metrics.js). */
+    async unsetPicks(catalogId, keys) {
+      if (!keys?.length) return;
+      await CatalogStat.updateOne({ _id: catalogId }, { $unset: Object.fromEntries(keys.map((k) => [`itemPicks.${k}`, ''])) });
+    },
   };
 }

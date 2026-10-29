@@ -12,7 +12,7 @@ One selfie, one full-body photo and an occasion become a complete, coordinated l
 | Service | Used for | Cost |
 |---|---|---|
 | Node 20 or newer | server and client | free |
-| MongoDB Atlas (free M0 cluster) | sessions, ledger, catalogs, counters. Metadata only, never images | free |
+| MongoDB Atlas (free M0 cluster) | sessions, accounts, the shared catalog, retailer upload history, ledger, counters. Metadata only, never images | free |
 | YouCam API key | skin tone, outfit, jewellery and lipstick try-on | 1,000 free units per hackathon participant |
 | Cloudinary account | temporary storage for photos and drawn results | free tier is enough |
 | Language model key (optional) | reading typed refinements. Without it, chips and a keyword reader still work | optional |
@@ -44,7 +44,7 @@ The server refuses to start with a readable message if a required value is missi
 2. Press **Fetch live prices** (free). This is the real YouCam price list; it pins the unit costs shown in the app.
 3. Go to the landing page, choose **Use a sample model** (spends nothing), then walk through details, colours and looks.
 4. Choose a look and press **See it on me**. This draws on the sample model and spends about 4 units. The ledger on `/system` and the **Under the hood** panel show every call, its time and its units.
-5. Open **Catalog** to see the sample catalog and, under it, the live retailer counts. Your look from step 4 is already counted there.
+5. Open **Catalog** to see the shared catalog (13 starter items from `server/src/data/seedCatalog.json`). Optionally create a shopper account on **Sign in** to keep your colours and looks.
 
 Items that cannot be confirmed without a live key are listed in `docs/CONTEXT.md` under "Needs verifying". The first live run settles them.
 
@@ -68,19 +68,21 @@ The server tests use in-memory stand-ins for MongoDB, Cloudinary and a local moc
 
 **Under the hood** (header, any page) streams every step with its tool, time and units. The limits panel shows units used against the session cap.
 
-## The retailer view
+## Catalog, retailers and accounts
 
-A retailer imports a catalog (CSV or JSON, with a validation report) and gets two private links: a shopper link and a manage link. The manage link opens the catalog and a usage view with:
+**One shared catalog.** There is a single catalog in MongoDB. It starts from `server/src/data/seedCatalog.json` (edit that file and redeploy to change the starting items; the server re-applies it when the file changes). Every retailer upload is added to it, so shoppers see new items at once with no link to share. The old 30-item sample catalog and its images are gone.
 
-- sessions that planned a look from the catalog
-- looks generated, and the average units spent per drawn look
-- most chosen items
-- what shoppers change (lipstick, formality, budget and so on)
-- sessions where nothing fit the budget
+**Retailer accounts.** Header > **For retailers** shows a sign-in / create-account page (email, password, shop name, contact name, phone, city, optional website and GSTIN, and a confirmation that they may use the photos). Signed in, the retailer's dashboard lists every upload and every item, kept on the server, so a refresh or a new browser loses nothing. They can upload more files (add or replace), see each upload's report, delete one item, or delete a whole upload. Deleting removes the item's database record, its stored image, its usage counters and shoppers' "never show me this" entries. Each retailer's item ids are prefixed with a private code, so two retailers can both use `SKU-1`. A retailer can only see and change their own items.
 
-Counts are anonymous: no photos, no skin readings, no names, no network addresses and no typed text. Until a real session happens every count is zero and the page says so. **Download CSV** exports the same numbers. The sample catalog's counts are public (the sample catalog is too), which is how you see the view working without importing anything: header > **For retailers** > the link to the sample catalog, or **Catalog**.
+**Mixed looks and store links.** By default a shopper's looks are planned from the whole shared catalog, so one look can pair a dress from one retailer with a necklace from another and earrings from a third. Each item shows who sells it and links to the retailer's own product page (`product_url`). Every retailer also gets a store link, `/shop/<code>`, shown on their dashboard with a copy button. A shopper who starts from it gets suggestions only from that retailer (the same account-free flow). A banner shows the scope and lets them switch back to every retailer. If the store has no items left, planning falls back to the whole catalog. API: `GET /api/catalog/store/:code` and `PUT /api/sessions/me/store`.
 
-How a session is counted: it counts once, when it first plans a look from that catalog. A look counts once, when it is really going to be drawn; a look refused by a spending cap, a retry, and a look drawn again from cache do not count again. Code: `server/src/services/metrics/`, `server/src/routes/stats.js`.
+**Usage view.** Anonymous counts of how often shoppers' looks used the retailer's items (times picked, items picked, most chosen, CSV). No photos, skin readings, names or network addresses.
+
+**Shopper accounts (optional).** Every feature works without one. Creating one (header > **Sign in**) keeps the anonymous session the person was using: photos, skin reading and every later reading, preferences and looks, in one place at `/account`. Signed-in shoppers get their saved session back in any browser. Their spending counters reset daily; the unit cap is a rolling 24 hours. Deleting the account removes everything.
+
+**Security notes.** Passwords are scrypt-hashed. Sign-in tokens are random, stored only as SHA-256, kept in the browser's localStorage and expire after 30 days unused (`AUTH_TOKEN_DAYS`). Sign-in attempts are limited per IP and per account. There is no email verification or password reset yet (no mail service is wired in). Signed-in shoppers' sessions are kept `ACCOUNT_SESSION_DAYS` (default 365) after their last visit.
+
+Code: `server/src/services/{auth,catalog,metrics}/`, `server/src/routes/{auth,retailer,account,catalog}.js`.
 
 ## Limits and spending caps
 
@@ -114,7 +116,7 @@ If you run behind a proxy other than Render's single proxy, check `trust proxy` 
 | Finished YouCam tasks | YouCam (they keep results for a limited time) | Deleted right after each result is copied to our storage; retried by the sweeper and the delete button |
 | Session record (consent, preferences, colour numbers, look metadata) | MongoDB | With the session. Holds no images and no face data |
 | Unit ledger (feature, units, time. No images, no photos) | MongoDB | After 30 days |
-| Usage counters | MongoDB | Numbers only. Removed with the catalog |
+| Usage counters | MongoDB | Numbers only. A deleted item's counter is removed with it |
 | Agent trace ("Under the hood") | Server memory | With the session, or on restart |
 | Share links | Nowhere: signed tokens | Expire after 24 hours or when the session ends. Pictures stream through the server, never as direct storage links |
 
@@ -124,13 +126,13 @@ Photos are used only to process the request. They are never used for training, a
 
 Sessions created before this change that already expired may have left files in Cloudinary under `ensemble/`. Delete that folder once in the Cloudinary console if you ran earlier builds with real photos.
 
-**Logs** are structured JSON in production (one line per request, with the request id). Session ids and catalog and share tokens are never logged: tokens are masked in URLs, and a session appears only as a short one-way fingerprint (`sid`) so one visit can be followed.
+**Logs** are structured JSON in production (one line per request, with the request id). Session ids, sign-in tokens and share tokens are never logged: share tokens are masked in URLs, and a session appears only as a short one-way fingerprint (`sid`) so one visit can be followed.
 
 ## Deploy
 
 **Server on Render:** New > Blueprint > select this repo (uses `render.yaml`). Set the secret values it lists. Use the `starter` plan so the instance never sleeps during judging. Health check: `/healthz`.
 
-**Client on Vercel:** New Project > select this repo > set **Root Directory** to `client`. Set `VITE_API_URL` to the Render URL. Then add the Vercel URL to `CLIENT_ORIGINS` on Render, set `PUBLIC_CLIENT_URL` to the same URL (the server fetches sample photos and sample catalog images from it), and redeploy the server.
+**Client on Vercel:** New Project > select this repo > set **Root Directory** to `client`. Set `VITE_API_URL` to the Render URL. Then add the Vercel URL to `CLIENT_ORIGINS` on Render, set `PUBLIC_CLIENT_URL` to the same URL (the server fetches sample model photos from it), and redeploy the server.
 
 **MongoDB Atlas:** allow Render's outbound IPs (or `0.0.0.0/0` for the hackathon) under Network Access.
 
@@ -138,16 +140,19 @@ Set `ENABLE_DEV_ROUTES=false` for the final build if you do not want the System 
 
 ## API at a glance
 
-Full contracts are in `docs/CONTEXT.md`. Anonymous sessions send `X-Session-Id`; catalog links send `X-Catalog-Token`.
+Full contracts are in `docs/CONTEXT.md`. Anonymous sessions send `X-Session-Id`; signed-in accounts send `Authorization: Bearer <token>`.
 
 - `POST /api/sessions`, `GET /api/sessions/me`, `DELETE /api/sessions/me` (delete everything)
 - Intake: `/api/intake/config`, consent, photos, sample model, preferences
 - `POST /api/sessions/me/skin-profile`, override
-- `GET /api/catalog/sample`, `POST /api/catalogs/import`, `GET /api/catalogs/mine`
+- `GET /api/catalog` (shared catalog, public), `/api/catalog/config`, `/api/catalog/template`
+- `POST /api/auth/:role/register|login` (role: `retailer` or `shopper`), `GET /api/auth/me`, `POST /api/auth/logout|password`, `DELETE /api/auth/account`
+- Retailer: `GET /api/retailer/dashboard`, `POST /api/retailer/uploads`, `GET|DELETE /api/retailer/uploads/:id(/report)`, `DELETE /api/retailer/items/:id`
+- Shopper: `GET /api/account/overview`
 - `POST /api/sessions/me/plan`
 - `POST /api/sessions/me/looks`, `GET .../looks/:id/events` (live progress), share
 - `POST /api/sessions/me/agent/turn`, trace and governor
-- `GET /api/catalogs/mine/stats` and `.csv` (manage link), `GET /api/catalog/sample/stats` and `.csv`
+- `GET /api/retailer/stats` and `.csv` (signed-in retailer)
 - `GET /api/system/status`, `GET /healthz`
 
 ## Troubleshooting
@@ -155,7 +160,7 @@ Full contracts are in `docs/CONTEXT.md`. Anonymous sessions send `X-Session-Id`;
 - **"Invalid environment" at start**: the message names the variable. Fix `server/.env`.
 - **A look stops with "spending limit"**: a cap was reached. See the table above; raise `SESSION_UNIT_CAP` for testing, never above what you have left of the 1,000 units.
 - **429 "Too many requests"**: a per-IP limit. Wait for `Retry-After`, or raise the matching `LIMIT_*` value while testing.
-- **Sample photos do not load when drawing**: the server fetches them from `PUBLIC_CLIENT_URL`. Locally the Vite dev server must be running.
+- **Sample model photos do not load when drawing**: the server fetches them from `PUBLIC_CLIENT_URL`. Locally the Vite dev server must be running.
 - **Share link dead after a restart**: `SHARE_SECRET` is not set.
 - **Download of a look is blocked**: the browser refused to read the cloud images into a canvas. Save the two pictures one by one instead.
 

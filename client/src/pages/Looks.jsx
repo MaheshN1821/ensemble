@@ -1,3 +1,5 @@
+import AccountNudge from '../components/auth/AccountNudge.jsx';
+import StoreBanner from '../components/StoreBanner.jsx';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
@@ -167,5 +169,5 @@ export default function Looks() {
       </Shell>
     );
   }
-  return <Shell><Ready plan={p.plan} constraints={p.constraints} replan={replan} busy={busy} see={see} /></Shell>;
+  return <Shell><StoreBanner sessionId={sessionId} className="mb-8 max-w-2xl" onChange={() => p.replan(p.constraints)} /><Ready plan={p.plan} constraints={p.constraints} replan={replan} busy={busy} see={see} /><AccountNudge className="mt-12 max-w-2xl" /></Shell>;
 }

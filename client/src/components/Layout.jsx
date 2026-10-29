@@ -6,6 +6,7 @@ import ErrorBoundary from './ui/ErrorBoundary.jsx';
 import OfflineBanner from './ui/OfflineBanner.jsx';
 import TraceDrawer from './agent/TraceDrawer.jsx';
 import { readStoredSession } from '../lib/session.js';
+import { useAuth } from '../hooks/useAuth.jsx';
 
 // One place for page titles: the browser tab, history and screen readers all announce them.
 const TITLES = [
@@ -18,8 +19,8 @@ const TITLES = [
   ['/compare', 'Compare two looks'],
   ['/s/:token', 'A shared look'],
   ['/catalog', 'Catalog'],
-  ['/c/:token', 'Catalog'],
   ['/retailer', 'For retailers'],
+  ['/account', 'Your account'],
   ['/system', 'System'],
 ];
 const titleFor = (pathname) => TITLES.find(([pattern]) => matchPath({ path: pattern, end: true }, pathname))?.[1] ?? 'Page not found';
@@ -31,6 +32,7 @@ const NAV = [
 ];
 
 function Header({ hasSession, onHood }) {
+  const { shopper } = useAuth();
   const [menu, setMenu] = useState(false);
   const { pathname } = useLocation();
   const button = useRef(null);
@@ -55,6 +57,7 @@ function Header({ hasSession, onHood }) {
         <nav className="hidden items-center gap-7 md:flex" aria-label="Main">
           {NAV.map((n) => <NavLink key={n.to} to={n.to} className={link}>{n.label}</NavLink>)}
           {hasSession && <button type="button" onClick={onHood} className={hoodClass}><span aria-hidden="true" className="font-mono text-[13px]">{'{ }'}</span>Under the hood</button>}
+          <NavLink to="/account" className={link}>{shopper.token ? 'Account' : 'Sign in'}</NavLink>
           <Button to="/start" className="h-10 px-5 text-sm">Start</Button>
         </nav>
 
@@ -72,6 +75,7 @@ function Header({ hasSession, onHood }) {
           <ul className="divide-y divide-line">
             <li><NavLink to="/#how" className="flex min-h-12 items-center text-[17px]">How it works</NavLink></li>
             {NAV.map((n) => <li key={n.to}><NavLink to={n.to} className="flex min-h-12 items-center text-[17px]">{n.label}</NavLink></li>)}
+            <li><NavLink to="/account" className="flex min-h-12 items-center text-[17px]">{shopper.token ? 'Account' : 'Sign in'}</NavLink></li>
             {hasSession && <li><button type="button" onClick={() => { setMenu(false); onHood(); }} className="flex min-h-12 w-full items-center text-left text-[17px]">Under the hood</button></li>}
             <li><NavLink to="/system" className="flex min-h-12 items-center text-[17px]">System</NavLink></li>
           </ul>
@@ -91,6 +95,7 @@ function Footer({ hasSession, onHood }) {
         </div>
         <ul className="flex flex-wrap gap-x-6 gap-y-1">
           <li><Link to="/start" className="inline-flex min-h-11 items-center hover:text-rani">Delete my photos and data</Link></li>
+          <li><Link to="/account" className="inline-flex min-h-11 items-center hover:text-rani">Account</Link></li>
           {hasSession && <li><button type="button" onClick={onHood} className="inline-flex min-h-11 items-center hover:text-rani">Under the hood</button></li>}
           <li><Link to="/retailer" className="inline-flex min-h-11 items-center hover:text-rani">For retailers</Link></li>
         </ul>

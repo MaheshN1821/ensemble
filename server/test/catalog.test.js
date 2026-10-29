@@ -11,9 +11,8 @@ import { checkImage } from '../src/services/catalog/imageChecks.js';
 import { createImporter, parseRows } from '../src/services/catalog/importer.js';
 import { createCatalogService } from '../src/services/catalog/service.js';
 import { createMemoryCatalogRepo } from '../src/services/catalog/repoMemory.js';
-import { SAMPLE_ITEMS, SAMPLE_CATALOG_ID } from '../src/data/sampleCatalog.js';
-import { COLOUR_FAMILIES } from '../src/config/skin.js';
-import { LIMITS, occasionIds } from '../src/config/catalog.js';
+import { SEED_ROWS } from '../src/data/seed.js';
+import { LIMITS, MAIN_CATALOG_ID, occasionIds } from '../src/config/catalog.js';
 import { createMemoryStorage } from './fakes.js';
 
 const silentLogger = { info() {}, warn() {}, error() {}, debug() {} };
@@ -174,13 +173,19 @@ const fakeFetcher = (map) => ({
   },
 });
 
-function build({ storage = createMemoryStorage({ configured: false }), images } = {}) {
+function build({ storage = createMemoryStorage({ configured: true }), images = {}, seed } = {}) {
   const repo = createMemoryCatalogRepo();
-  const fetcher = fakeFetcher(images);
-  const importer = createImporter({ fetcher, storage, logger: silentLogger });
-  const catalogs = createCatalogService({ repo, importer, storage, config: { publicClientUrl: 'https://app.test/' }, logger: silentLogger });
-  return { repo, catalogs, storage };
+  const calls = { metrics: [], sessions: [] };
+  const metrics = { removeItems: async (c, ids) => { calls.metrics.push([c, ids]); }, deleteCatalog: async () => {} };
+  const sessions = { dropExcludedItems: async (ids) => { calls.sessions.push(ids); } };
+  const importer = createImporter({ fetcher: fakeFetcher(images), storage, logger: silentLogger });
+  const catalogs = createCatalogService({ repo, importer, storage, metrics, sessions, config: { publicClientUrl: 'https://app.test/' }, logger: silentLogger, ...(seed ? { seed } : {}) });
+  return { repo, catalogs, storage, calls };
 }
+
+const retailer = (id, code, businessName) => ({ _id: id, role: 'retailer', retailer: { code, businessName } });
+const A = retailer('acc-a', 'ra1', 'Priya Silks');
+const B = retailer('acc-b', 'rb2', 'Kavya Jewels');
 
 const FILE = [
   'id,type,name,price,image_url,formality,occasion_tags,metal_tone,colours',
@@ -192,10 +197,54 @@ const FILE = [
   'B1,outfit,Bad price,abc,https://shop.test/saree.png,3,,,',
 ].join('\n');
 const IMAGES = { 'https://shop.test/saree.png': garmentPng(500, 700), 'https://shop.test/necklace.png': garmentPng(300, 300), 'https://shop.test/tiny.png': garmentPng(50, 50) };
+const rowsOf = (n, from = 0, extra = '') => ['id,type,name,price,image_url,formality', ...Array.from({ length: n }, (_, i) => `K${from + i},outfit,Kurta ${from + i}${extra},1000,https://shop.test/saree.png,3`)].join('\n');
 
-test('import: valid rows are usable at once, every bad row says why, colours come from the photo', async () => {
+test('built-in catalog: the 13 items from the seed file, old sample removed, applied once', async () => {
+  assert.equal(SEED_ROWS.length, 13);
+  const { catalogs, repo } = build({ images: {} }); // photos unreachable: items still come in, flagged for a retry
+  await repo.upsertCatalog({ _id: 'sample', name: 'Sample catalog', source: 'sample' });
+  await repo.upsertItems('sample', [{ itemId: 'old', type: 'outfit', name: 'Old', price: 100 }]);
+
+  const first = await catalogs.ensureMain();
+  assert.equal(first.seeded, true);
+  assert.equal(first.clean, false);
+  assert.equal(await repo.getCatalog('sample'), null, 'the old sample catalog is gone');
+  assert.equal(await repo.countItems('sample'), 0);
+
+  const main = await catalogs.getMain();
+  assert.equal(main.catalog.itemCount, 13);
+  assert.deepEqual(main.catalog.counts, { outfit: 10, necklace: 1, earrings: 1, lipstick: 1 });
+  assert.ok(main.items.every((i) => i.source === 'house' && i.seller === 'Ensemble'));
+  assert.equal(main.items.find((i) => i.id === 'o-101').colourSource, 'merchant', 'explicit colours from the file are used');
+  assert.equal(main.items.find((i) => i.id === 'j-310').colourSource, 'none', 'no colours given and the photo was unreachable');
+
+  // Unreadable photos mean the next run tries again; once everything reads cleanly it settles.
+  assert.equal((await catalogs.ensureMain()).seeded, true);
+});
+
+test('built-in catalog: settles once photos read, reads missing colours from them, never touches retailer items', async () => {
+  const all = Object.fromEntries(SEED_ROWS.map((r) => [r.image_url, garmentPng(500, 700)]));
+  const { catalogs, repo } = build({ images: { ...all, ...IMAGES } });
+  await catalogs.ensureMain();
+  assert.equal((await catalogs.ensureMain()).seeded, false);
+  assert.equal((await catalogs.getMain()).items.find((i) => i.id === 'j-310').colourSource, 'image');
+  await catalogs.importForRetailer(A, { content: FILE });
+  const stored = (await repo.getCatalog(MAIN_CATALOG_ID)).version;
+  assert.ok(stored && !stored.includes('!'));
+
+  // Editing the seed file re-applies it: items dropped from the file go, retailer items stay.
+  const smaller = build({ images: { ...all, ...IMAGES }, seed: { rows: SEED_ROWS.slice(0, 3), version: 'v2' } });
+  smaller.repo.catalogs.set(MAIN_CATALOG_ID, { ...(await repo.getCatalog(MAIN_CATALOG_ID)) });
+  for (const it of await repo.listItems(MAIN_CATALOG_ID)) smaller.repo.items.set(`${MAIN_CATALOG_ID}\u0000${it.itemId}`, it);
+  await smaller.catalogs.ensureMain();
+  const left = await smaller.catalogs.getMain();
+  assert.equal(left.items.filter((i) => i.source === 'house').length, 3);
+  assert.equal(left.items.filter((i) => i.source === 'retailer').length, 2);
+});
+
+test('retailer upload: items join the shared catalog under the retailer, bad rows say why', async () => {
   const { catalogs } = build({ images: IMAGES });
-  const out = await catalogs.createFromImport({ name: 'Priya Silks', content: FILE });
+  const out = await catalogs.importForRetailer(A, { content: FILE, fileName: 'festive.csv' });
   assert.equal(out.report.totals.rows, 6);
   assert.equal(out.report.totals.imported, 2);
   assert.equal(out.report.totals.rejected, 4);
@@ -204,135 +253,167 @@ test('import: valid rows are usable at once, every bad row says why, colours com
   assert.match(byLine[5].errors[0].message, /status 404/);
   assert.match(byLine[6].errors[0].message, /50 by 50/);
   assert.equal(byLine[7].errors[0].field, 'price');
+  assert.equal(byLine[2].id, 's1', 'reports show the id as the retailer wrote it');
 
-  assert.equal(out.items.length, 2);
-  const saree = out.items.find((i) => i.id === 's1');
+  // Shoppers see it with no link or login.
+  const shop = await catalogs.getMain();
+  const saree = shop.items.find((i) => i.sku === 's1');
+  assert.equal(saree.id, 'ra1-s1');
+  assert.equal(saree.seller, 'Priya Silks');
+  assert.equal(saree.source, 'retailer');
   assert.deepEqual(saree.colours.map((c) => c.family).sort(), ['champagne', 'maroon']);
-  assert.equal(saree.colourSource, 'image');
-  assert.equal(out.items.find((i) => i.id === 'n1').colourSource, 'merchant');
-  assert.equal(saree.source, 'merchant');
-  assert.match(out.tokens.share, /^ensc_/); assert.match(out.tokens.manage, /^ensm_/);
-  assert.equal(out.catalog.role, 'owner');
-  assert.deepEqual(out.catalog.counts, { outfit: 1, necklace: 1, earrings: 0, lipstick: 0 });
+  assert.ok(shop.catalog.sellers.includes('Priya Silks'));
+  assert.equal((await catalogs.itemsForSession({})).items.length, 2);
+  assert.equal((await catalogs.itemsForSession({ catalogId: 'whatever-old' })).catalog.id, MAIN_CATALOG_ID);
 });
 
-test('import: tokens are stored hashed, share link cannot manage, wrong token reveals nothing', async () => {
-  const { catalogs, repo } = build({ images: IMAGES });
-  const { tokens } = await catalogs.createFromImport({ name: 'Priya Silks', content: FILE });
-  const stored = JSON.stringify([...repo.catalogs.values()]);
-  assert.ok(!stored.includes(tokens.share) && !stored.includes(tokens.manage));
-
-  assert.equal((await catalogs.open(tokens.share)).catalog.role, 'viewer');
-  assert.equal((await catalogs.open(tokens.manage)).catalog.role, 'owner');
-  await assert.rejects(catalogs.importInto(tokens.share, { content: FILE }), { code: 'CATALOG_FORBIDDEN' });
-  await assert.rejects(catalogs.removeCatalog(tokens.share), { code: 'CATALOG_FORBIDDEN' });
-  await assert.rejects(catalogs.open('ensc_notarealtokennotarealtoken'), { code: 'CATALOG_NOT_FOUND' });
-  await assert.rejects(catalogs.open(''), { code: 'CATALOG_NOT_FOUND' });
+test('retailer dashboard keeps everything: every upload, every item, across uploads', async () => {
+  const { catalogs } = build({ images: IMAGES });
+  const first = await catalogs.importForRetailer(A, { content: rowsOf(3), fileName: 'first.csv' });
+  const second = await catalogs.importForRetailer(A, { content: rowsOf(4, 10), fileName: 'second.csv' });
+  const board = await catalogs.openDashboard(A);
+  assert.equal(board.summary.items, 7);
+  assert.equal(board.items.length, 7);
+  assert.equal(board.uploads.length, 2);
+  assert.deepEqual(board.uploads.map((u) => u.fileName).sort(), ['first.csv', 'second.csv']);
+  assert.equal(board.uploads.find((u) => u.id === first.uploadId).itemsNow, 3);
+  assert.equal(board.uploads.find((u) => u.id === second.uploadId).itemsNow, 4);
+  // Same upload again updates by id and moves the items to the newest upload.
+  const again = await catalogs.importForRetailer(A, { content: rowsOf(3), fileName: 'third.csv' });
+  assert.equal(again.report.totals.updated, 3);
+  assert.equal((await catalogs.openDashboard(A)).summary.items, 7);
 });
 
-test('import: nothing valid is rejected with the full report and creates no catalog', async () => {
-  const { catalogs, repo } = build({ images: IMAGES });
-  const bad = 'name,type,price,image_url\nA,outfit,abc,https://shop.test/saree.png';
-  await assert.rejects(catalogs.createFromImport({ name: 'Nope', content: bad }), (e) => e.code === 'IMPORT_REJECTED' && e.details.report.totals.rejected === 1);
-  assert.equal(repo.catalogs.size, 0);
-  await assert.rejects(catalogs.createFromImport({ name: ' ', content: FILE }), { code: 'INVALID_INPUT' });
+test('two retailers can use the same id; each sees and changes only their own', async () => {
+  const { catalogs } = build({ images: IMAGES });
+  await catalogs.importForRetailer(A, { content: rowsOf(2) });
+  await catalogs.importForRetailer(B, { content: rowsOf(2, 0, ' (B)') });
+  assert.equal((await catalogs.getMain()).items.length, 4);
+  assert.equal((await catalogs.openDashboard(A)).items.length, 2);
+  assert.ok((await catalogs.openDashboard(B)).items.every((i) => i.seller === 'Kavya Jewels'));
+  await assert.rejects(catalogs.removeItem(B, 'ra1-k0'), { code: 'NOT_FOUND' });
+  await assert.rejects(catalogs.removeUpload(B, (await catalogs.openDashboard(A)).uploads[0].id), { code: 'NOT_FOUND' });
+  await assert.rejects(catalogs.openDashboard({ _id: 'x', role: 'shopper' }), { code: 'FORBIDDEN' });
+  assert.equal((await catalogs.getMain()).items.length, 4);
 });
 
-test('import: append updates by id, replace removes the rest, and stored images are cleaned up', async () => {
+test('built-in items cannot be deleted by a retailer', async () => {
+  const { catalogs } = build({ images: {} });
+  await catalogs.ensureMain();
+  await assert.rejects(catalogs.removeItem(A, 'o-101'), { code: 'NOT_FOUND' });
+  assert.equal((await catalogs.getMain()).items.length, 13);
+});
+
+test('deleting an item removes it everywhere: catalog, planner, stored image, counters, exclusion lists', async () => {
+  const { catalogs, storage, calls } = build({ images: IMAGES });
+  await catalogs.importForRetailer(A, { content: FILE });
+  assert.equal(storage.assets.size, 2);
+  const board = await catalogs.removeItem(A, 'ra1-n1');
+  assert.equal(board.items.length, 1);
+  assert.ok(!storage.assets.has(`ensemble-catalog/${MAIN_CATALOG_ID}/ra1-n1`));
+  assert.equal(storage.assets.size, 1);
+  assert.deepEqual(calls.metrics, [[MAIN_CATALOG_ID, ['ra1-n1']]]);
+  assert.deepEqual(calls.sessions, [['ra1-n1']]);
+  assert.equal((await catalogs.itemsForSession({})).items.length, 1);
+  await assert.rejects(catalogs.removeItem(A, 'ra1-n1'), { code: 'NOT_FOUND' });
+});
+
+test('a failed image delete leaves the item in place so it can be retried', async () => {
   const storage = createMemoryStorage({ configured: true });
   const { catalogs } = build({ images: IMAGES, storage });
-  const created = await catalogs.createFromImport({ name: 'Priya Silks', content: FILE });
-  const { tokens } = created;
-  assert.ok(created.items.every((i) => i.imageUrl.startsWith('https://cdn.test/ensemble-catalog/')));
-  assert.equal(created.items.find((i) => i.id === 's1').colourSource, 'image', 'local PNG colours used when storage returns none');
-  assert.equal(storage.assets.size, 2);
-
-  const more = 'id,type,name,price,image_url,formality,metal_tone\nE1,earrings,Gold jhumka,3200,https://shop.test/necklace.png,5,gold\nS1,outfit,Maroon saree v2,15000,https://shop.test/saree.png,5,';
-  const appended = await catalogs.importInto(tokens.manage, { content: more });
-  assert.equal(appended.report.totals.updated, 1);
-  assert.equal(appended.catalog.itemCount, 3);
-  assert.equal(appended.items.find((i) => i.id === 's1').price, 15000);
-
-  const replaced = await catalogs.importInto(tokens.manage, { content: more, mode: 'replace' });
-  assert.equal(replaced.catalog.itemCount, 2);
-  assert.equal(replaced.report.totals.removed, 1);
-  assert.ok(!storage.assets.has('ensemble-catalog/' + created.catalog.id + '/n1'), 'removed item image deleted from storage');
-
-  const after = await catalogs.removeItem(tokens.manage, 'e1');
-  assert.equal(after.catalog.itemCount, 1);
-  await assert.rejects(catalogs.removeItem(tokens.manage, 'e1'), { code: 'NOT_FOUND' });
-  await catalogs.removeCatalog(tokens.manage);
-  assert.equal(storage.assets.size, 0);
-  await assert.rejects(catalogs.open(tokens.share), { code: 'CATALOG_NOT_FOUND' });
+  await catalogs.importForRetailer(A, { content: FILE });
+  const real = storage.deleteCatalogImage;
+  storage.deleteCatalogImage = async () => { throw new Error('storage down'); };
+  await assert.rejects(catalogs.removeItem(A, 'ra1-s1'), { code: 'DELETE_FAILED' });
+  assert.equal((await catalogs.openDashboard(A)).items.length, 2);
+  storage.deleteCatalogImage = real;
+  assert.equal((await catalogs.removeItem(A, 'ra1-s1')).items.length, 1);
 });
 
-test('catalog size limit holds', async () => {
+test('deleting an upload removes its items, but not ones a later upload took over', async () => {
   const { catalogs } = build({ images: IMAGES });
-  const { tokens } = await catalogs.createFromImport({ name: 'Big', content: FILE });
-  const rows = (from) => ['name,type,price,image_url,formality', ...Array.from({ length: 60 }, (_, i) => `Item ${from + i},outfit,1000,https://shop.test/saree.png,3`)].join('\n');
-  await catalogs.importInto(tokens.manage, { content: rows(0) });
-  await catalogs.importInto(tokens.manage, { content: rows(100) });
-  await catalogs.importInto(tokens.manage, { content: rows(200) });
-  await assert.rejects(catalogs.importInto(tokens.manage, { content: rows(300) }), { code: 'CATALOG_FULL' });
+  const one = await catalogs.importForRetailer(A, { content: rowsOf(3) });
+  await catalogs.importForRetailer(A, { content: rowsOf(1) }); // updates K0, so K0 now belongs to the second upload
+  const board = await catalogs.removeUpload(A, one.uploadId);
+  assert.deepEqual(board.items.map((i) => i.sku), ['k0']);
+  assert.equal(board.uploads.length, 1);
 });
 
-test('expired merchant catalogs stop resolving and are swept with their images', async () => {
-  let clock = new Date('2026-10-20T00:00:00Z');
-  const storage = createMemoryStorage({ configured: true });
-  const repo = createMemoryCatalogRepo();
-  const importer = createImporter({ fetcher: fakeFetcher(IMAGES), storage, logger: silentLogger });
-  const catalogs = createCatalogService({ repo, importer, storage, config: { catalogTtlDays: 30 }, logger: silentLogger, now: () => clock });
-  await catalogs.ensureSample();
-  const { tokens } = await catalogs.createFromImport({ name: 'Temp', content: FILE });
-  clock = new Date('2026-11-25T00:00:00Z');
-  await assert.rejects(catalogs.open(tokens.share), { code: 'CATALOG_NOT_FOUND' });
-  assert.deepEqual(await catalogs.sweepExpired(), { swept: 1 });
-  assert.equal(storage.assets.size, 0);
-  assert.ok(await repo.getCatalog(SAMPLE_CATALOG_ID), 'the sample catalog never expires');
+test('replace removes only this retailer\'s other items', async () => {
+  const { catalogs, storage } = build({ images: IMAGES });
+  await catalogs.importForRetailer(B, { content: rowsOf(2) });
+  await catalogs.importForRetailer(A, { content: rowsOf(3) });
+  const out = await catalogs.importForRetailer(A, { content: rowsOf(1, 0), mode: 'replace' });
+  assert.equal(out.report.totals.removed, 2);
+  assert.equal(out.items.length, 1);
+  assert.equal((await catalogs.openDashboard(B)).items.length, 2);
+  assert.equal(storage.assets.size, 3);
 });
 
-// ---- sample catalog ----
-test('sample catalog: 12/6/6/6, valid, original, seeded once, ready for the planner', async () => {
-  const count = (t) => SAMPLE_ITEMS.filter((i) => i.type === t).length;
-  assert.deepEqual([count('outfit'), count('necklace'), count('earrings'), count('lipstick')], [12, 6, 6, 6]);
-  assert.equal(new Set(SAMPLE_ITEMS.map((i) => i.itemId)).size, SAMPLE_ITEMS.length);
-  for (const i of SAMPLE_ITEMS) {
-    assert.ok(i.price >= LIMITS.price.min && i.formality >= 1 && i.formality <= 5, i.itemId);
-    assert.ok(i.colours.length >= 1 && i.colours.every((c) => COLOUR_FAMILIES[c.family] && /^#[0-9A-F]{6}$/.test(c.hex)), i.itemId);
-    assert.ok(i.occasions.every((o) => occasionIds.includes(o)), i.itemId);
-    if (i.type === 'outfit') assert.ok(i.garmentCategory);
-    if (i.type === 'necklace' || i.type === 'earrings') assert.ok(i.metalTone);
-    assert.ok(i.prompt && !/brand|logo/i.test(i.prompt.replace(/no brand/i, '')), i.itemId);
-  }
-  // Every occasion has at least one outfit, and the cheapest look (outfit + lipstick) is a real number for the "nothing fits" path.
-  for (const o of occasionIds) assert.ok(SAMPLE_ITEMS.some((i) => i.type === 'outfit' && i.occasions.includes(o)), o);
-  const cheapest = Math.min(...SAMPLE_ITEMS.filter((i) => i.type === 'outfit').map((i) => i.price)) + Math.min(...SAMPLE_ITEMS.filter((i) => i.type === 'lipstick').map((i) => i.price));
-  assert.ok(cheapest > 2000 && cheapest < 5000);
+test('a rejected upload is kept in the history with its report; limits hold', async () => {
+  const { catalogs } = build({ images: IMAGES });
+  const bad = 'name,type,price,image_url\nA,outfit,abc,https://shop.test/saree.png';
+  await assert.rejects(catalogs.importForRetailer(A, { content: bad, fileName: 'bad.csv' }), (e) => e.code === 'IMPORT_REJECTED' && e.details.report.totals.rejected === 1);
+  const board = await catalogs.openDashboard(A);
+  assert.equal(board.uploads[0].status, 'rejected');
+  const rep = await catalogs.uploadReport(A, board.uploads[0].id);
+  assert.equal(rep.report.rows[0].errors[0].field, 'price');
+  await assert.rejects(catalogs.importForRetailer(A, { content: rowsOf(1), mode: 'merge' }), { code: 'INVALID_INPUT' });
 
+  const per = LIMITS.maxItemsPerRetailer;
+  const full = build({ images: IMAGES });
+  for (let from = 0; from < per; from += 50) await full.catalogs.importForRetailer(A, { content: rowsOf(Math.min(50, per - from), from) });
+  assert.equal((await full.catalogs.openDashboard(A)).summary.items, per);
+  await assert.rejects(full.catalogs.importForRetailer(A, { content: rowsOf(1, per) }), { code: 'CATALOG_FULL' });
+});
+
+test('deleting a retailer account removes all of their items and uploads', async () => {
+  const { catalogs, storage } = build({ images: IMAGES });
+  await catalogs.importForRetailer(B, { content: rowsOf(1) });
+  await catalogs.importForRetailer(A, { content: FILE });
+  await catalogs.removeAllForRetailer(A);
+  assert.equal((await catalogs.openDashboard(A)).items.length, 0);
+  assert.equal((await catalogs.openDashboard(A)).uploads.length, 0);
+  assert.equal((await catalogs.getMain()).items.length, 1);
+  assert.equal(storage.assets.size, 1);
+});
+
+test('private catalogs left from before accounts are swept when expired', async () => {
   const { catalogs, repo } = build({ images: {} });
-  assert.equal((await catalogs.ensureSample()).seeded, true);
-  assert.equal((await catalogs.ensureSample()).seeded, false);
-  const s = await catalogs.getSample();
-  assert.equal(s.items.length, 30);
-  assert.ok(s.items.every((i) => i.source === 'sample' && i.imageUrl.startsWith('https://app.test/catalog/sample/')), 'image urls are absolute for server-side use');
-  assert.ok(!('prompt' in (await repo.listItems(SAMPLE_CATALOG_ID))[0]));
-  // Stable order for a deterministic planner
-  assert.deepEqual(s.items.map((i) => i.id), (await catalogs.getSample()).items.map((i) => i.id));
-
-  // Sessions without a choice plan from the sample; a session pointing at a gone catalog falls back.
-  assert.equal((await catalogs.itemsForSession({})).catalog.id, 'sample');
-  const gone = await catalogs.itemsForSession({ catalogId: 'deleted' });
-  assert.equal(gone.fellBack, true); assert.equal(gone.items.length, 30);
+  await catalogs.ensureMain();
+  await repo.upsertCatalog({ _id: 'legacy', name: 'Old', source: 'merchant', expiresAt: new Date(Date.now() - 1000) });
+  await repo.upsertItems('legacy', [{ itemId: 'a', type: 'outfit', name: 'A', price: 100 }]);
+  assert.deepEqual(await catalogs.sweepExpired(), { swept: 1 });
+  assert.equal(await repo.countItems('legacy'), 0);
+  assert.ok(await repo.getCatalog(MAIN_CATALOG_ID));
 });
 
-test('sample images exist on disk and read back as their declared colours', async () => {
-  const { readFile } = await import('node:fs/promises');
-  const { fileURLToPath } = await import('node:url');
-  const dir = fileURLToPath(new URL('../../client/public/catalog/sample/', import.meta.url));
-  for (const i of SAMPLE_ITEMS) {
-    const buf = await readFile(`${dir}${i.itemId}.png`);
-    const check = checkImage(buf, i.type);
-    assert.deepEqual(check.errors, [], i.itemId);
-    if (i.type === 'outfit') assert.equal(check.pixels.colours[0].family, i.colours[0].family, i.itemId);
-  }
+test('store link: a session scoped to one retailer plans only from their items; others mix every retailer', async () => {
+  const { catalogs } = build({ images: IMAGES });
+  await catalogs.ensureMain();
+  await catalogs.importForRetailer(A, { content: FILE });
+  await catalogs.importForRetailer(B, { content: rowsOf(2) });
+
+  // Everyone else: one pool across retailers, so a look can mix sellers.
+  const open = await catalogs.itemsForSession({});
+  const sellers = new Set(open.items.map((i) => i.seller));
+  assert.ok(sellers.has('Priya Silks') && sellers.has('Kavya Jewels') && sellers.has('Ensemble'));
+
+  // A store's public page.
+  const store = await catalogs.getStore('ra1');
+  assert.equal(store.store.name, 'Priya Silks');
+  assert.equal(store.store.itemCount, 2);
+  assert.ok(store.items.every((i) => i.seller === 'Priya Silks'));
+  await assert.rejects(() => catalogs.getStore('nope'), { code: 'STORE_NOT_FOUND' });
+
+  // A scoped session sees only that store.
+  const scoped = await catalogs.itemsForSession({ storeCode: 'ra1' });
+  assert.equal(scoped.items.length, 2);
+  assert.ok(scoped.items.every((i) => i.seller === 'Priya Silks'));
+  assert.equal(scoped.fellBack, false);
+
+  // A store with nothing left falls back to the whole catalog.
+  const gone = await catalogs.itemsForSession({ storeCode: 'rzz9' });
+  assert.equal(gone.fellBack, true);
+  assert.ok(gone.items.length > 2);
 });

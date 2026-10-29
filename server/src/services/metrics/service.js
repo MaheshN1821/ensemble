@@ -1,9 +1,9 @@
-import { REFINEMENT_LABELS, SAMPLE_STATS_ID, STATS_NOTE, TOP_ITEMS_SHOWN, decodeKey, encodeKey } from '../../config/metrics.js';
+import { MAIN_STATS_ID, REFINEMENT_LABELS, STATS_NOTE, TOP_ITEMS_SHOWN, decodeKey, encodeKey } from '../../config/metrics.js';
 
 const SLOTS = ['outfit', 'necklace', 'earrings', 'lipstick'];
 
-/** The catalog a session plans from. A session with no catalog uses the sample catalog. */
-export const catalogIdOf = (session) => session?.catalogId || SAMPLE_STATS_ID;
+/** Everyone plans from the one shared catalog, so every counter lives under it (a session's old private-catalog id is ignored). */
+export const catalogIdOf = () => MAIN_STATS_ID;
 
 const csvCell = (v) => {
   let s = v === null || v === undefined ? '' : String(v);
@@ -65,9 +65,48 @@ export function createMetrics({ store, sessions, logger }) {
       });
     },
 
-    /** Removes a catalog's counters (the retailer deleted the catalog, or it expired). */
+    /** Removes a catalog's counters (an old private catalog expired, or was deleted). */
     deleteCatalog(catalogId) {
       return safe('deleteCatalog', () => store.delete(catalogId));
+    },
+
+    /** A retailer deleted items: their pick counts go too, so nothing keeps listing them. */
+    removeItems(catalogId, itemIds) {
+      return safe('removeItems', () => store.unsetPicks(catalogId, (itemIds ?? []).map(encodeKey)));
+    },
+
+    /**
+     * A retailer's own view: how often shoppers' looks included THEIR items. The shared catalog's session and spend totals
+     * are not theirs, so they are not shown. `items` are the retailer's current items; picks of anything since deleted are gone.
+     */
+    async retailerReport(items = []) {
+      const doc = (await store.get(MAIN_STATS_ID)) ?? {};
+      const n = (v) => (Number.isFinite(v) ? v : 0);
+      const picks = doc.itemPicks ?? {};
+      const rows = items
+        .map((it) => ({ id: it.id, sku: it.sku ?? it.id, name: it.name, type: it.type, price: it.price, picks: n(picks[encodeKey(it.id)]) }))
+        .sort((a, b) => b.picks - a.picks || a.name.localeCompare(b.name));
+      const picked = rows.filter((r) => r.picks > 0);
+      return {
+        empty: picked.length === 0,
+        since: doc.since ?? null,
+        updatedAt: doc.updatedAt ?? null,
+        totals: { itemsListed: rows.length, itemsPicked: picked.length, picks: picked.reduce((s, r) => s + r.picks, 0) },
+        topItems: picked.slice(0, TOP_ITEMS_SHOWN),
+        notYetPicked: rows.length - picked.length,
+        note: STATS_NOTE,
+      };
+    },
+
+    /** The retailer report as CSV: every item, with its picks (zero included), so it opens as one flat table. */
+    retailerCsv(report, items = []) {
+      const picksOf = new Map([...report.topItems].map((r) => [r.id, r.picks]));
+      const rows = [['item_id', 'name', 'type', 'price_inr', 'times_picked']];
+      for (const it of items) rows.push([it.sku ?? it.id, it.name, it.type, it.price, picksOf.get(it.id) ?? 0]);
+      rows.push([]);
+      rows.push(['counting_since', report.since ? new Date(report.since).toISOString() : '']);
+      rows.push(['exported_at', new Date().toISOString()]);
+      return `﻿${rows.map((r) => r.map(csvCell).join(',')).join('\r\n')}\r\n`;
     },
 
     /**

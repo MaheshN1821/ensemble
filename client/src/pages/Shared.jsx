@@ -52,7 +52,7 @@ export default function Shared() {
       <ul className="mt-4 divide-y divide-line border-y border-line text-[15px]">
         {look.items.map((i) => (
           <li key={`${i.type}-${i.name}`} className="flex flex-wrap items-baseline justify-between gap-x-4 py-3">
-            <span><span className="text-ink-soft">{TYPE_LABEL[i.type]}: </span>{i.name}</span>
+            <span><span className="text-ink-soft">{TYPE_LABEL[i.type]}: </span>{i.name}{i.seller && <span className="text-ink-soft"> · {i.seller}</span>}</span>
             <span className="flex items-baseline gap-4">
               <span className="font-mono text-[13px]">{rupees(i.price)}</span>
               {i.productUrl && <a href={i.productUrl} target="_blank" rel="noopener noreferrer" className="text-rani underline underline-offset-2 hover:text-rani-deep">View product<span className="sr-only"> (opens in a new tab)</span></a>}

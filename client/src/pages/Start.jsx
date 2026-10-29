@@ -3,6 +3,7 @@ import { useSession } from '../hooks/useSession.js';
 import { useIntake } from '../hooks/useIntake.js';
 import LoadingBlock from '../components/ui/LoadingBlock.jsx';
 import Button from '../components/Button.jsx';
+import StoreBanner from '../components/StoreBanner.jsx';
 import Stepper from '../components/intake/Stepper.jsx';
 import Consent from '../components/intake/Consent.jsx';
 import Photos from '../components/intake/Photos.jsx';
@@ -101,6 +102,7 @@ export default function Start() {
   return (
     <Shell>
       <Stepper current={step} />
+      <StoreBanner sessionId={session?.sessionId} className="mt-6" />
       <div className="mt-10">
         {step === 'consent' && (
           <Consent

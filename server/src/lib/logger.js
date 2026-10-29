@@ -10,8 +10,8 @@ export function createLogger({ level = 'info', isProd = false } = {}) {
     formatters: { level: (label) => ({ level: label }) },
     redact: {
       paths: [
-        'req.headers.authorization', 'req.headers.cookie', 'req.headers["x-session-id"]', 'req.headers["x-catalog-token"]',
-        'headers.authorization', 'headers["x-session-id"]', 'headers["x-catalog-token"]',
+        'req.headers.authorization', 'req.headers.cookie', 'req.headers["x-session-id"]',
+        'headers.authorization', 'headers["x-session-id"]',
       ],
       censor: '[redacted]',
     },

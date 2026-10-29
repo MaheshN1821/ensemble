@@ -75,7 +75,13 @@ export function createSkinService({ gateway, storage, sessions, logger }) {
       });
     }
 
-    const next = await sessions.patch(session._id, { set: { skinProfile: stored } });
+    const set = { skinProfile: stored };
+    if (session.accountId) {
+      // A signed-in shopper keeps every reading, newest last (colour numbers and labels only), so they can look back later.
+      const entry = { analysedAt: stored.analysedAt ?? new Date(), source: stored.source, skinHex: stored.skin?.hex ?? null, depth: stored.depth?.id ?? null, undertone: stored.undertone?.id ?? null };
+      set.skinHistory = [...(session.skinHistory ?? []), entry].slice(-20);
+    }
+    const next = await sessions.patch(session._id, { set });
     if (!next) throw sessionGone();
     return next.skinProfile;
   }

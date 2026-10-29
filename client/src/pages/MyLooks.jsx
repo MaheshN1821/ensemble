@@ -1,3 +1,4 @@
+import AccountNudge from '../components/auth/AccountNudge.jsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSession } from '../hooks/useSession.js';
@@ -87,7 +88,7 @@ export default function MyLooks() {
     <Shell>
       <h1 ref={heading} tabIndex={-1} className={H1}>My looks</h1>
       <p className="mt-4 max-w-[60ch] text-[17px] leading-relaxed text-ink-soft">
-        {l.looks.length === 0 ? 'Looks you choose to see on yourself are kept here for this session.' : `${l.looks.length} of ${l.max} kept for this session. Pick any two to compare them side by side.`}
+        {l.looks.length === 0 ? 'Looks you choose to see on yourself are kept here. Without an account, that is for today only.' : `${l.looks.length} of ${l.max} kept. Pick any two to compare them side by side.`}
       </p>
 
       {l.looks.length === 0 ? (
@@ -122,6 +123,7 @@ export default function MyLooks() {
         </>
       )}
 
+      <AccountNudge className="mt-10 max-w-2xl">Without an account these looks are deleted within a day. A free account keeps them, and your colour reading, so you can open them again later.</AccountNudge>
       <div className="mt-10 flex flex-wrap gap-3">
         <Button to="/looks" variant="secondary">Plan new looks</Button>
       </div>

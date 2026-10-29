@@ -1,0 +1,271 @@
+{
+  "items": [
+    {
+      "id": "O-101",
+      "type": "outfit",
+      "name": "Mustard-gold embroidered kurta",
+      "price": 2499,
+      "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1792521653/Mustard_Gold_Jacquard_Kurta_neji6b.png",
+      "garment_category": "full_body",
+      "colours": [
+        "#D4A017",
+        "#D4AF37"
+      ],
+      "formality": 3,
+      "occasion_tags": [
+        "festive",
+        "sangeet-mehendi"
+      ],
+      "product_url": "https://res.cloudinary.com/maheshn18/image/upload/v1792521653/Mustard_Gold_Jacquard_Kurta_neji6b.png",
+      "style": "traditional",
+      "silhouette": "kurta-set"
+    },
+    {
+      "id": "O-102",
+      "type": "outfit",
+      "name": "Olive-green embroidered fusion kurta",
+      "price": 2799,
+      "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1792521652/Olive_Embroidered_Kurta_Cutout_rwfhjs.png",
+      "garment_category": "full_body",
+      "colours": [
+        "#667238",
+        "#D4AF37",
+        "#F2E8D5"
+      ],
+      "formality": 3,
+      "occasion_tags": [
+        "festive",
+        "wedding-guest"
+      ],
+      "product_url": "https://example.com/p/o-102",
+      "style": "fusion",
+      "silhouette": "kurta-set"
+    },
+    {
+      "id": "O-103",
+      "type": "outfit",
+      "name": "Maroon silk saree with gold zari",
+      "price": 14500,
+      "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1792521652/Maroon_Silk_Saree_with_Gold_Zari_it1go0.png",
+      "garment_category": "full_body",
+      "colours": [
+        "#800020",
+        "#D4AF37"
+      ],
+      "formality": 5,
+      "occasion_tags": [
+        "wedding-guest",
+        "festive",
+        "sangeet-mehendi"
+      ],
+      "product_url": "https://res.cloudinary.com/maheshn18/image/upload/v1792521652/Maroon_Silk_Saree_with_Gold_Zari_it1go0.png",
+      "style": "traditional",
+      "silhouette": "saree"
+    },
+    {
+      "id": "O-104",
+      "type": "outfit",
+      "name": "Ivory embroidered Anarkali gown",
+      "price": 8999,
+      "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1792521652/Ivory_Anarkali_Gown_with_Embroidered_Dupatta_x14auc.png",
+      "garment_category": "full_body",
+      "colours": [
+        "#F2E8D5",
+        "#D4AF37",
+        "#DEAAA4",
+        "#A3B18A"
+      ],
+      "formality": 5,
+      "occasion_tags": [
+        "wedding-guest",
+        "festive",
+        "sangeet-mehendi"
+      ],
+      "product_url": "https://example.com/p/o-104",
+      "style": "traditional",
+      "silhouette": "dress"
+    },
+    {
+      "id": "O-105",
+      "type": "outfit",
+      "name": "Lavender embroidered lehenga set",
+      "price": 11999,
+      "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1792521655/Lavender_Embroidered_Lehenga_Set_ou57nz.png",
+      "garment_category": "full_body",
+      "colours": [
+        "#B7A1D1",
+        "#B784A7",
+        "#D4AF37",
+        "#F2E8D5"
+      ],
+      "formality": 5,
+      "occasion_tags": [
+        "wedding-guest",
+        "sangeet-mehendi",
+        "festive"
+      ],
+      "product_url": "https://example.com/p/o-105",
+      "style": "traditional",
+      "silhouette": "lehenga"
+    },
+    {
+      "id": "O-106",
+      "type": "outfit",
+      "name": "Dusty teal Indo-western palazzo set",
+      "price": 7499,
+      "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1792521653/Teal_Embroidered_Palazzo_Ensemble_go9rrr.png",
+      "garment_category": "full_body",
+      "colours": [
+        "#5F9EA0",
+        "#6F91B5",
+        "#D4AF37",
+        "#F2E8D5"
+      ],
+      "formality": 4,
+      "occasion_tags": [
+        "wedding-guest",
+        "festive",
+        "sangeet-mehendi"
+      ],
+      "product_url": "https://example.com/p/o-106",
+      "style": "fusion",
+      "silhouette": "western"
+    },
+    {
+      "id": "O-107",
+      "type": "outfit",
+      "name": "Blush-pink floral chiffon blouse",
+      "price": 1899,
+      "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1792521650/Blush_Floral_Chiffon_Peplum_Blouse_aepobc.png",
+      "garment_category": "upper_body",
+      "colours": [
+        "#DEAAA4",
+        "#F08070",
+        "#FFFDD0",
+        "#A3B18A"
+      ],
+      "formality": 3,
+      "occasion_tags": [
+        "festive",
+        "brunch",
+        "office"
+      ],
+      "product_url": "https://example.com/p/o-107",
+      "style": "contemporary",
+      "silhouette": "western"
+    },
+    {
+      "id": "O-108",
+      "type": "outfit",
+      "name": "Black tailored blazer",
+      "price": 4999,
+      "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1792521649/Tailored_Black_Blazer_with_Gold_Button_nh06vs.png",
+      "garment_category": "outerwear",
+      "colours": [
+        "#1C1C1E",
+        "#D4AF37"
+      ],
+      "formality": 4,
+      "occasion_tags": [
+        "office",
+        "brunch"
+      ],
+      "product_url": "https://example.com/p/o-108",
+      "style": "contemporary",
+      "silhouette": "western"
+    },
+    {
+      "id": "O-109",
+      "type": "outfit",
+      "name": "Coral-pink chiffon midi dress",
+      "price": 3299,
+      "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1792521650/Coral_Chiffon_Ruffled_Dress_ryyyoc.png",
+      "garment_category": "full_body",
+      "colours": [
+        "#F08070"
+      ],
+      "formality": 3,
+      "occasion_tags": [
+        "festive",
+        "brunch",
+        "wedding-guest"
+      ],
+      "product_url": "https://example.com/p/o-109",
+      "style": "contemporary",
+      "silhouette": "dress"
+    },
+    {
+      "id": "O-110",
+      "type": "outfit",
+      "name": "Emerald-green satin evening gown",
+      "price": 6999,
+      "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1792521649/Emerald_Satin_Draped_Evening_Gown_ec7xqu.png",
+      "garment_category": "full_body",
+      "colours": [
+        "#046A38"
+      ],
+      "formality": 5,
+      "occasion_tags": [
+        "wedding-guest",
+        "festive",
+        "cocktail"
+      ],
+      "product_url": "https://example.com/p/o-110",
+      "style": "contemporary",
+      "silhouette": "dress"
+    },
+    {
+      "id": "J-310",
+      "type": "necklace",
+      "name": "Gold kundan necklace with green drops",
+      "price": 8400,
+      "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1792521955/Ornate_Gold_Kundan_Necklace_with_Green_Accents_nppltf.png",
+      "metal_tone": "gold",
+      "formality": 5,
+      "occasion_tags": [
+        "wedding-guest",
+        "sangeet-mehendi",
+        "festive"
+      ]
+    },
+    {
+      "id": "E-210",
+      "type": "earrings",
+      "name": "Gold kundan jhumka with emerald-green and pearl drops",
+      "price": 3200,
+      "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1792521955/Ornate_Emerald_and_Gold_Jhumka_Earring_rqo5ke.png",
+      "metal_tone": "gold",
+      "colours": [
+        "#D4AF37",
+        "#F5F5F5",
+        "#046A38",
+        "#F2E8D5"
+      ],
+      "formality": 5,
+      "occasion_tags": [
+        "wedding-guest",
+        "sangeet-mehendi",
+        "festive"
+      ],
+      "style": "traditional",
+      "silhouette": "single ornate jhumka earring"
+    },
+    {
+      "id": "L-501",
+      "type": "lipstick",
+      "name": "Dusty rose satin-matte lipstick",
+      "price": 520,
+      "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1792521955/Luxury_Gold_and_Black_Rose_Lipstick_qijv2q.png",
+      "colours": [
+        "#B85D68"
+      ],
+      "formality": 3,
+      "occasion_tags": [
+        "wedding-guest",
+        "festive",
+        "office",
+        "brunch"
+      ]
+    }
+  ]
+}

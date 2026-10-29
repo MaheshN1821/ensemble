@@ -10,6 +10,7 @@ import { createMemoryLedger } from '../src/services/ledger.js';
 import { createImporter } from '../src/services/catalog/importer.js';
 import { createCatalogService } from '../src/services/catalog/service.js';
 import { createMemoryCatalogRepo } from '../src/services/catalog/repoMemory.js';
+import { seedFixture } from './fixtures/seedFixture.js';
 import { createSkinService } from '../src/services/skin/service.js';
 import { createRenderService } from '../src/services/render/service.js';
 import { createMetrics } from '../src/services/metrics/service.js';
@@ -24,7 +25,7 @@ function newMetrics(sessions = createMemorySessions(['s1', 's2', 's3'])) {
   const store = createMemoryStatStore();
   return { store, sessions, metrics: createMetrics({ store, sessions, logger: silentLogger }) };
 }
-const cat = { id: 'c1', name: 'Priya Silks', source: 'merchant' };
+const cat = { id: 'main', name: 'Ensemble catalog', source: 'main' };
 const item = (id, type = 'outfit', name = id, price = 1000) => ({ id, type, name, price });
 const settleMicro = () => new Promise((r) => setTimeout(r, 15));
 
@@ -34,22 +35,21 @@ test('counters: a session counts once, "nothing within budget" counts once, empt
   const { metrics } = newMetrics();
   assert.equal((await metrics.report(cat, [])).empty, true);
 
-  await metrics.planned({ _id: 's1', catalogId: 'c1' }, { status: 'ok' });
-  await metrics.planned({ _id: 's1', catalogId: 'c1' }, { status: 'ok' }); // same session again
-  await metrics.planned({ _id: 's2', catalogId: 'c1' }, { status: 'over_budget' });
-  await metrics.planned({ _id: 's2', catalogId: 'c1' }, { status: 'over_budget' }); // the same miss again
-  await metrics.planned({ _id: 's3', catalogId: 'other' }, { status: 'ok' }); // a different catalog
+  await metrics.planned({ _id: 's1', catalogId: 'main' }, { status: 'ok' });
+  await metrics.planned({ _id: 's1', catalogId: 'main' }, { status: 'ok' }); // same session again
+  await metrics.planned({ _id: 's2', catalogId: 'main' }, { status: 'over_budget' });
+  await metrics.planned({ _id: 's2', catalogId: 'main' }, { status: 'over_budget' }); // the same miss again
+  await metrics.planned({ _id: 's3', catalogId: 'an-old-private-catalog' }, { status: 'ok' }); // an old session pointing elsewhere still counts under the shared catalog
 
   const r = await metrics.report(cat, []);
   assert.equal(r.empty, false);
-  assert.equal(r.totals.sessions, 2);
+  assert.equal(r.totals.sessions, 3);
   assert.equal(r.totals.nothingWithinBudget, 1);
-  assert.equal((await metrics.report({ ...cat, id: 'other' }, [])).totals.sessions, 1);
 });
 
 test('counters: looks, most chosen items (with names, and ids for removed items), units, refinements', async () => {
   const { metrics } = newMetrics();
-  const c = { catalogId: 'c1' };
+  const c = { catalogId: 'main' };
   await metrics.lookStarted(c, { outfit: item('saree-a'), lipstick: item('red', 'lipstick') });
   await metrics.lookStarted(c, { outfit: item('saree-a'), necklace: item('gold-choker', 'necklace') });
   await metrics.lookStarted(c, { outfit: item('lehenga.b') }); // a dot in an id must survive
@@ -78,8 +78,8 @@ test('counters: looks, most chosen items (with names, and ids for removed items)
 test('counters: a failing store never breaks the caller', async () => {
   const store = { inc: async () => { throw new Error('mongo is down'); }, get: async () => null, delete: async () => {} };
   const metrics = createMetrics({ store, sessions: createMemorySessions(['s1']), logger: silentLogger });
-  await metrics.planned({ _id: 's1', catalogId: 'c1' }, { status: 'ok' }); // resolves, does not throw
-  await metrics.lookStarted({ catalogId: 'c1' }, { outfit: item('a') });
+  await metrics.planned({ _id: 's1', catalogId: 'main' }, { status: 'ok' }); // resolves, does not throw
+  await metrics.lookStarted({ catalogId: 'main' }, { outfit: item('a') });
   assert.ok(true);
 });
 
@@ -91,8 +91,8 @@ test('counter keys: ids with dots, dollar signs and slashes round-trip', () => {
 
 test('CSV: one flat table, formulas made harmless, quotes escaped, numbers as numbers', async () => {
   const { metrics } = newMetrics();
-  const c = { catalogId: 'c1' };
-  await metrics.planned({ _id: 's1', catalogId: 'c1' }, { status: 'ok' });
+  const c = { catalogId: 'main' };
+  await metrics.planned({ _id: 's1', catalogId: 'main' }, { status: 'ok' });
   await metrics.lookStarted(c, { outfit: item('evil') });
   await metrics.unitsSpent(c, { units: 3, firstForLook: true });
   const report = await metrics.report(cat, [item('evil', 'outfit', '=HYPERLINK("http://x","click")', 1)]);
@@ -125,8 +125,9 @@ async function bootRender({ configOver = {}, sessionOver = {} } = {}) {
   const config = { sessionUnitCap: 50, globalDailyUnitCap: 100, publicClientUrl: 'https://app.test', render: {}, shareSecret: 'test-secret-test-secret', ...configOver };
   const sessions = createMemorySessions();
   const { store, metrics } = newMetrics(sessions);
-  const catalogs = createCatalogService({ repo: createMemoryCatalogRepo(), importer: createImporter({ fetcher: {}, storage, logger: silentLogger }), storage, metrics, config, logger: silentLogger });
-  await catalogs.ensureSample();
+  const repo = createMemoryCatalogRepo();
+  const catalogs = createCatalogService({ repo, importer: createImporter({ fetcher: {}, storage, logger: silentLogger }), storage, metrics, config, logger: silentLogger });
+  await seedFixture(repo);
   const d = sessions.docs.get('sess-1');
   d.consent = { over18: true, ownPhotos: false };
   d.preferences = { occasion: 'wedding-guest', occasionText: '', budgetInr: 25000, silhouettes: [], metal: 'any', avoidColours: [], notes: '' };
@@ -147,7 +148,7 @@ async function bootRender({ configOver = {}, sessionOver = {} } = {}) {
     }
     throw new Error('look never finished');
   };
-  const report = async () => { await settleMicro(); return metrics.report({ id: 'sample', name: 'Sample catalog', source: 'sample' }, (await catalogs.getSample()).items); };
+  const report = async () => { await settleMicro(); return metrics.report({ id: 'main', name: 'Ensemble catalog', source: 'main' }, (await catalogs.getMain()).items); };
   return { renders, gateway, sessions, storage, session, settle, store, metrics, report, catalogs, ledger, config };
 }
 const IDS = { outfit: 'outfit-ivory-kurta', necklace: 'necklace-oxidised-choker', earrings: 'earrings-pearl-drop', lipstick: 'lipstick-classic-red' };
@@ -183,12 +184,32 @@ test('retailer counters fill from real renders: looks, units, a repeat is free, 
   assert.equal(r.topItems.find((x) => x.id === IDS.outfit).picks, 2);
 });
 
-test('retailer counters follow the catalog the session uses, not the sample catalog', async () => {
+test('counters always land under the shared catalog, whatever catalog id an old session carries', async () => {
   const t = await bootRender();
   await t.metrics.planned({ _id: 'sess-1', catalogId: 'merchant-1' }, { status: 'ok' });
   await t.metrics.lookStarted({ catalogId: 'merchant-1' }, { outfit: item('x') });
-  assert.equal((await t.store.get('merchant-1')).looksGenerated, 1);
-  assert.equal(await t.store.get('sample'), null);
+  assert.equal((await t.store.get('main')).looksGenerated, 1);
+  assert.equal(await t.store.get('merchant-1'), null);
+});
+
+test('retailer report: only their items, picks per item, and deleted items drop out of the counters', async () => {
+  const { metrics, store } = newMetrics();
+  await metrics.lookStarted({}, { outfit: item('ra1-s1'), lipstick: item('l-501', 'lipstick') });
+  await metrics.lookStarted({}, { outfit: item('ra1-s1') });
+  const mine = [{ id: 'ra1-s1', sku: 's1', name: 'Maroon saree', type: 'outfit', price: 14500 }, { id: 'ra1-n1', sku: 'n1', name: 'Gold necklace', type: 'necklace', price: 6200 }];
+  let r = await metrics.retailerReport(mine);
+  assert.equal(r.empty, false);
+  assert.deepEqual(r.totals, { itemsListed: 2, itemsPicked: 1, picks: 2 });
+  assert.deepEqual(r.topItems.map((x) => [x.sku, x.picks]), [['s1', 2]]);
+  assert.equal(r.notYetPicked, 1);
+  assert.ok(!JSON.stringify(r).includes('l-501'), 'other sellers\' items never show');
+  assert.match(metrics.retailerCsv(r, mine), /s1,Maroon saree,outfit,14500,2\r\n.*n1,Gold necklace,necklace,6200,0/s);
+
+  await metrics.removeItems('main', ['ra1-s1']);
+  await settleMicro();
+  assert.equal((await store.get('main')).itemPicks[encodeKey('ra1-s1')], undefined);
+  r = await metrics.retailerReport([mine[1]]);
+  assert.equal(r.empty, true);
 });
 
 // ---------- caps stop spending cleanly ----------
@@ -298,70 +319,45 @@ function png(w, h) {
 const IMAGES = { 'https://shop.test/saree.png': png(500, 700) };
 const fetcher = { fetchImage: async (url) => { if (!IMAGES[url]) throw new Error('404'); return { buffer: IMAGES[url], contentType: 'image/png' }; } };
 
-test('retailer view API: manage link only, honest empty state, then real counts, CSV, and gone with the catalog', async () => {
+test('retailer usage API: signed-in retailer only, honest empty state, their items only, CSV', async () => {
   const storage = createMemoryStorage({ configured: false });
   const sessions = createMemorySessions(['sess-1']);
-  const { store, metrics } = newMetrics(sessions);
+  const { metrics } = newMetrics(sessions);
   const config = { clientOrigins: [], enableDevRoutes: false, sessionUnitCap: 50, globalDailyUnitCap: 100, publicClientUrl: 'https://app.test', catalogImportsPerHour: 100 };
-  const catalogs = createCatalogService({ repo: createMemoryCatalogRepo(), importer: createImporter({ fetcher, storage, logger: silentLogger }), storage, metrics, config, logger: silentLogger });
-  await catalogs.ensureSample();
+  const repo = createMemoryCatalogRepo();
+  const catalogs = createCatalogService({ repo, importer: createImporter({ fetcher, storage, logger: silentLogger }), storage, metrics, config, logger: silentLogger });
+  await seedFixture(repo);
   const app = createApp({ config, logger: silentLogger, gateway: {}, ledger: createMemoryLedger(), queue: new RequestQueue({ concurrency: 1 }), sessions, storage, catalogs, metrics, dbState: () => 'connected' });
   const server = await new Promise((r) => { const s = app.listen(0, () => r(s)); });
   const base = `http://127.0.0.1:${server.address().port}`;
-  const get = (path, token) => fetch(`${base}${path}`, { headers: token ? { 'x-catalog-token': token } : {} });
+  const get = (path, token) => fetch(`${base}${path}`, { headers: token ? { authorization: `Bearer ${token}` } : {} });
   try {
+    const reg = await fetch(`${base}/api/auth/retailer/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'p@shop.in', password: 'Silk&Zari-2026', name: 'Priya', businessName: 'Priya Silks', phone: '9876543210', city: 'Pune', acceptTerms: true }) });
+    assert.equal(reg.status, 201);
+    const { token, account } = await reg.json();
     const f = new FormData();
-    f.append('name', 'Priya Silks');
     f.append('file', new Blob(['id,type,name,price,image_url,formality,occasion_tags\nS1,outfit,Maroon saree,14500,https://shop.test/saree.png,5,wedding-guest'], { type: 'text/plain' }), 'c.csv');
-    const made = await (await fetch(`${base}/api/catalogs/import`, { method: 'POST', body: f })).json();
-    const { share, manage } = made.tokens;
-    const cid = made.catalog.id;
+    const up = await fetch(`${base}/api/retailer/uploads`, { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: f });
+    assert.equal(up.status, 201);
+    const id = `${account.retailer.code}-s1`;
 
-    // Who may look.
-    assert.equal((await get('/api/catalogs/mine/stats', share)).status, 403);
-    assert.equal((await get('/api/catalogs/mine/stats.csv', share)).status, 403);
-    assert.equal((await get('/api/catalogs/mine/stats')).status, 404);
-    assert.equal((await get('/api/catalogs/mine/stats', 'x'.repeat(30))).status, 404);
+    assert.equal((await get('/api/retailer/stats')).status, 401);
+    assert.equal((await get('/api/retailer/stats', 'x'.repeat(40))).status, 401);
 
-    // Honest empty state: zeros and a flag, not made-up numbers.
-    let r = await (await get('/api/catalogs/mine/stats', manage)).json();
+    let r = await (await get('/api/retailer/stats', token)).json();
     assert.equal(r.empty, true);
-    assert.deepEqual(r.totals, { sessions: 0, looksGenerated: 0, looksDrawn: 0, nothingWithinBudget: 0, units: 0, avgUnitsPerLook: null });
-    assert.deepEqual(r.topItems, []);
-    assert.equal(r.catalog.name, 'Priya Silks');
+    assert.deepEqual(r.totals, { itemsListed: 1, itemsPicked: 0, picks: 0 });
 
-    // Real events, as the services record them.
-    await metrics.planned({ _id: 'sess-1', catalogId: cid }, { status: 'over_budget' });
-    await metrics.lookStarted({ catalogId: cid }, { outfit: { id: 's1', type: 'outfit' } });
-    await metrics.unitsSpent({ catalogId: cid }, { units: 2, firstForLook: true });
-    await metrics.refined({ catalogId: cid }, ['make_cheaper']);
-    r = await (await get('/api/catalogs/mine/stats', manage)).json();
+    await metrics.lookStarted({}, { outfit: { id, type: 'outfit' }, lipstick: { id: 'someone-elses', type: 'lipstick' } });
+    r = await (await get('/api/retailer/stats', token)).json();
     assert.equal(r.empty, false);
-    assert.equal(r.totals.sessions, 1);
-    assert.equal(r.totals.nothingWithinBudget, 1);
-    assert.equal(r.totals.avgUnitsPerLook, 2);
-    assert.deepEqual(r.topItems.map((x) => [x.id, x.name, x.picks]), [['s1', 'Maroon saree', 1]]);
-    assert.equal(r.refinements[0].label, 'Asked for something cheaper');
-    assert.ok(!JSON.stringify(r).match(/sess-1/), 'no session id anywhere in the report');
+    assert.deepEqual(r.topItems.map((x) => [x.sku, x.name, x.picks]), [['s1', 'Maroon saree', 1]]);
+    assert.ok(!JSON.stringify(r).includes('someone-elses'));
 
-    // CSV export.
-    const csvRes = await get('/api/catalogs/mine/stats.csv', manage);
+    const csvRes = await get('/api/retailer/stats.csv', token);
     assert.equal(csvRes.status, 200);
-    assert.match(csvRes.headers.get('content-type'), /text\/csv/);
     assert.match(csvRes.headers.get('content-disposition'), /ensemble-usage-priya-silks\.csv/);
-    assert.equal(csvRes.headers.get('cache-control'), 'no-store');
-    assert.match(await csvRes.text(), /item_picks,s1,Maroon saree,1/);
-
-    // The sample catalog's counts are public (so a reviewer can see the view working) and separate.
-    const sample = await (await get('/api/catalog/sample/stats')).json();
-    assert.equal(sample.catalog.id, 'sample');
-    assert.equal(sample.empty, true);
-    assert.equal((await get('/api/catalog/sample/stats.csv')).status, 200);
-
-    // Deleting the catalog deletes its counters.
-    assert.equal((await fetch(`${base}/api/catalogs/mine`, { method: 'DELETE', headers: { 'x-catalog-token': manage } })).status, 200);
-    assert.equal(await store.get(cid), null);
-    assert.equal((await get('/api/catalogs/mine/stats', manage)).status, 404);
+    assert.match(await csvRes.text(), /s1,Maroon saree,outfit,14500,1/);
   } finally { server.closeAllConnections?.(); server.close(); }
 });
 

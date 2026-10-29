@@ -5,15 +5,13 @@ export const sortItems = (list) => [...list].sort((a, b) => TYPE_ORDER[a.type] -
 export function createMemoryCatalogRepo() {
   const catalogs = new Map();
   const items = new Map(); // `${catalogId}\u0000${itemId}` -> item
+  const uploads = new Map(); // id -> upload
   const key = (c, i) => `${c}\u0000${i}`;
+  const inCatalog = (catalogId) => [...items.values()].filter((i) => i.catalogId === catalogId);
+  const clone = (list) => list.map((i) => structuredClone(i));
   return {
-    catalogs, items,
+    catalogs, items, uploads,
     getCatalog: async (id) => (catalogs.has(id) ? structuredClone(catalogs.get(id)) : null),
-    findByHash: async (hash) => {
-      const c = [...catalogs.values()].find((x) => x.shareHash === hash || x.manageHash === hash);
-      return c ? structuredClone(c) : null;
-    },
-    insertCatalog: async (doc) => { catalogs.set(doc._id, structuredClone(doc)); return structuredClone(doc); },
     upsertCatalog: async (doc) => { catalogs.set(doc._id, { ...(catalogs.get(doc._id) ?? {}), ...structuredClone(doc) }); return structuredClone(catalogs.get(doc._id)); },
     updateCatalog: async (id, set) => {
       if (!catalogs.has(id)) return null;
@@ -23,14 +21,33 @@ export function createMemoryCatalogRepo() {
     deleteCatalog: async (id) => { catalogs.delete(id); },
     listExpired: async (now) => [...catalogs.values()].filter((c) => c.source === 'merchant' && c.expiresAt && c.expiresAt <= now).map((c) => ({ _id: c._id })),
 
-    listItems: async (catalogId) => sortItems([...items.values()].filter((i) => i.catalogId === catalogId).map((i) => structuredClone(i))),
+    listItems: async (catalogId) => sortItems(clone(inCatalog(catalogId))),
+    listItemsByRetailer: async (catalogId, retailerId) => sortItems(clone(inCatalog(catalogId).filter((i) => i.retailerId === retailerId))),
+    listItemsByUpload: async (catalogId, retailerId, uploadId) => sortItems(clone(inCatalog(catalogId).filter((i) => i.retailerId === retailerId && i.uploadId === uploadId))),
     getItem: async (c, i) => (items.has(key(c, i)) ? structuredClone(items.get(key(c, i))) : null),
-    countItems: async (catalogId) => [...items.values()].filter((i) => i.catalogId === catalogId).length,
-    itemIds: async (catalogId) => new Set([...items.values()].filter((i) => i.catalogId === catalogId).map((i) => i.itemId)),
+    countItems: async (catalogId) => inCatalog(catalogId).length,
+    countItemsByRetailer: async (catalogId, retailerId) => inCatalog(catalogId).filter((i) => i.retailerId === retailerId).length,
+    itemIds: async (catalogId) => new Set(inCatalog(catalogId).map((i) => i.itemId)),
+    itemIdsByRetailer: async (catalogId, retailerId) => new Set(inCatalog(catalogId).filter((i) => i.retailerId === retailerId).map((i) => i.itemId)),
+    seedItemIds: async (catalogId) => new Set(inCatalog(catalogId).filter((i) => i.origin === 'seed').map((i) => i.itemId)),
     upsertItems: async (catalogId, list) => { for (const it of list) items.set(key(catalogId, it.itemId), { ...structuredClone(it), catalogId }); },
     deleteItem: async (c, i) => { items.delete(key(c, i)); },
     deleteItems: async (catalogId, ids) => {
       for (const [k, v] of items) if (v.catalogId === catalogId && (!ids || ids.includes(v.itemId))) items.delete(k);
     },
+
+    insertUpload: async (doc) => { uploads.set(doc._id, structuredClone(doc)); return structuredClone(doc); },
+    getUpload: async (id, retailerId) => {
+      const u = uploads.get(id);
+      return u && u.retailerId === retailerId ? structuredClone(u) : null;
+    },
+    listUploads: async (retailerId, limit = 100) => [...uploads.values()].filter((u) => u.retailerId === retailerId).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit).map((u) => structuredClone(u)),
+    itemCountsByUpload: async (catalogId, retailerId) => {
+      const out = {};
+      for (const i of inCatalog(catalogId)) if (i.retailerId === retailerId && i.uploadId) out[i.uploadId] = (out[i.uploadId] ?? 0) + 1;
+      return out;
+    },
+    deleteUpload: async (id) => { uploads.delete(id); },
+    deleteUploadsByRetailer: async (retailerId) => { for (const [k, u] of uploads) if (u.retailerId === retailerId) uploads.delete(k); },
   };
 }

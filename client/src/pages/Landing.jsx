@@ -45,7 +45,7 @@ const promises = [
   { title: 'Your budget is a hard limit', body: 'If nothing fits, we say so and show exactly what we relaxed.' },
   { title: 'Every pick explains itself', body: 'You see which styling rules applied, not just a score.' },
   { title: 'Previews are labelled', body: 'Every image is marked as an AI preview, and so are our sample models.' },
-  { title: 'Photos do not stay', body: 'No account. Photos are deleted within 24 hours, or the moment you ask.' },
+  { title: 'Photos do not stay', body: 'No account needed. Photos are deleted within 24 hours, or the moment you ask. An optional account keeps them for you instead.' },
 ];
 
 export default function Landing() {
@@ -64,7 +64,7 @@ export default function Landing() {
             <Button to="/start">Start with my photos</Button>
             <Button to="/start" variant="secondary">Try a sample model</Button>
           </div>
-          <p className="mt-5 text-sm text-ink-soft">No account. Photos are deleted within 24 hours.</p>
+          <p className="mt-5 text-sm text-ink-soft">No account needed. Photos are deleted within 24 hours unless you create an account to keep them.</p>
         </div>
         <Triptych />
       </section>

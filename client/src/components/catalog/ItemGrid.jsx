@@ -15,24 +15,23 @@ function Colours({ colours }) {
 }
 
 function Card({ item, onRemove, busy }) {
-  const sample = item.source === 'sample';
   return (
     <li className="flex flex-col overflow-hidden rounded-2xl border border-line bg-paper">
       <div className="relative aspect-[4/5] bg-white">
         <img
           src={item.imageUrl}
-          alt={`${item.name}${sample ? ' (sample illustration)' : ''}`}
+          alt={item.name}
           loading="lazy"
           className="size-full object-contain p-3"
         />
         <span className="absolute left-3 top-3 rounded-full bg-ink px-2.5 py-1 text-[12px] font-medium text-white">
-          {sample ? 'Sample' : TYPE_LABEL[item.type]}
+          {TYPE_LABEL[item.type]}
         </span>
       </div>
       <div className="flex flex-1 flex-col gap-2 border-t border-line p-4 text-[14px] text-ink-soft">
         <div>
           <p className="text-[16px] font-medium leading-snug text-ink">{item.name}</p>
-          <p className="mt-0.5">{sample ? `${TYPE_LABEL[item.type]} · ` : ''}{rupees(item.price)}</p>
+          <p className="mt-0.5">{rupees(item.price)}{item.seller ? ` · Sold by ${item.seller}` : ''}</p>
         </div>
         <Colours colours={item.colours} />
         <p>
@@ -58,8 +57,8 @@ function Card({ item, onRemove, busy }) {
   );
 }
 
-export default function ItemGrid({ items, onRemove, busy }) {
-  if (!items.length) return <p className="rounded-2xl border border-dashed border-line px-5 py-10 text-center text-ink-soft">No items of this type yet.</p>;
+export default function ItemGrid({ items, onRemove, busy, empty = 'No items of this type yet.' }) {
+  if (!items.length) return <p className="rounded-2xl border border-dashed border-line px-5 py-10 text-center text-ink-soft">{empty}</p>;
   return (
     <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {items.map((item) => <Card key={item.id} item={item} onRemove={onRemove} busy={busy} />)}

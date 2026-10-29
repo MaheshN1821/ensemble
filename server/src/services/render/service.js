@@ -110,7 +110,7 @@ export function createRenderService({
 
   // ---------- loading images ----------
 
-  /** Fetches one of our own static files (sample photos and sample catalog images live on the client origin). */
+  /** Fetches one of our own static files (sample model photos live on the client origin). */
   async function defaultFetchOwn(url) {
     if (!publicBase || new URL(url).origin !== new URL(publicBase).origin) throw new Error('not our own origin');
     const res = await fetch(url, { signal: AbortSignal.timeout(LIMITS.garmentTimeoutMs) });

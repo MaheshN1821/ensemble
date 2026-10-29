@@ -38,5 +38,9 @@ services:
         value: "30"
       - key: SESSION_SWEEP_MINUTES
         value: "5"
+      - key: AUTH_TOKEN_DAYS
+        value: "30"
+      - key: ACCOUNT_SESSION_DAYS
+        value: "365"
       - key: PUBLIC_CLIENT_URL
-        sync: false          # the Vercel URL; the server fetches sample photos and catalog images from it
+        sync: false          # the Vercel URL; the server fetches sample model photos from it

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { WEIGHTS, SEARCH } from '../src/config/planner.js';
 import { OCCASIONS } from '../src/config/intake.js';
 import { UNDERTONES, COLOUR_FAMILIES } from '../src/config/skin.js';
-import { SAMPLE_ITEMS } from '../src/data/sampleCatalog.js';
+import { SAMPLE_ITEMS } from './fixtures/sampleItems.js';
 import { buildContext, resolveOccasion, scoreLook } from '../src/services/planner/score.js';
 import { planLooks, rescoreLook, swapItem } from '../src/services/planner/plan.js';
 import { createPlannerService, plannerRules } from '../src/services/planner/service.js';

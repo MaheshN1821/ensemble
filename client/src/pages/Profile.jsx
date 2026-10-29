@@ -7,6 +7,7 @@ import Analysing from '../components/profile/Analysing.jsx';
 import Adjust from '../components/profile/Adjust.jsx';
 import { SwatchRow } from '../components/profile/Swatch.jsx';
 import { ErrorNote } from '../components/intake/fields.jsx';
+import AccountNudge from '../components/auth/AccountNudge.jsx';
 
 const H1 = 'text-[34px] font-light leading-[1.08] tracking-[-0.03em] outline-none sm:text-[44px]';
 const H2 = 'text-[22px] font-medium tracking-[-0.02em]';
@@ -199,6 +200,7 @@ export default function Profile() {
   return (
     <Shell>
       <Ready {...p} />
+      <AccountNudge className="mt-12 max-w-2xl" />
     </Shell>
   );
 }

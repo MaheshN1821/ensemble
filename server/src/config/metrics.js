@@ -15,7 +15,7 @@ export const REFINEMENT_LABELS = {
   other: 'Other',
 };
 
-export const SAMPLE_STATS_ID = 'sample';
+export const MAIN_STATS_ID = 'main'; // the shared catalog's counters
 export const TOP_ITEMS_SHOWN = 10;
 
 export const STATS_NOTE =

@@ -6,7 +6,7 @@ export function snapshotOf(look) {
   for (const [slot, i] of Object.entries(look.items)) {
     if (!i) continue;
     items[slot] = {
-      id: i.id, type: i.type, name: i.name, price: i.price, imageUrl: i.imageUrl, productUrl: i.productUrl ?? null,
+      id: i.id, type: i.type, name: i.name, price: i.price, imageUrl: i.imageUrl, productUrl: i.productUrl ?? null, seller: i.seller ?? null,
       metalTone: i.metalTone ?? null, garmentCategory: i.garmentCategory ?? null, source: i.source ?? 'merchant',
       colours: (i.colours ?? []).slice(0, 1),
     };
@@ -76,7 +76,7 @@ export function presentLook({ record, cacheByKey, live = null, active = false, s
 export function presentShared({ record, expiresAt, present }) {
   const snap = record.snapshot;
   return {
-    items: Object.values(snap.items).map((i) => ({ type: i.type, name: i.name, price: i.price, productUrl: i.productUrl })),
+    items: Object.values(snap.items).map((i) => ({ type: i.type, name: i.name, price: i.price, productUrl: i.productUrl, seller: i.seller ?? null })),
     totalPrice: snap.totalPrice,
     expiresAt: new Date(expiresAt).toISOString(),
     hasBody: Boolean(present.images.body),

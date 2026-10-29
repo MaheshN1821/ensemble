@@ -8,6 +8,8 @@ import { createYoucamClient } from './services/youcam/client.js';
 import { createGateway } from './services/youcam/gateway.js';
 import { createMongoLedger } from './services/ledger.js';
 import { createSessionService } from './services/sessions.js';
+import { createAuthService } from './services/auth/service.js';
+import { createMongoAuthStore } from './services/auth/store.js';
 import { createCloudinaryStorage } from './services/storage/cloudinary.js';
 import { createMongoCatalogRepo } from './services/catalog/repo.js';
 import { createCatalogService } from './services/catalog/service.js';
@@ -70,7 +72,8 @@ const gateway = createGateway({
     taskTimeoutMs: youcam.taskTimeoutMs,
   },
 });
-const sessions = createSessionService({ ttlHours: config.sessionTtlHours });
+const sessions = createSessionService({ ttlHours: config.sessionTtlHours, accountDays: config.accountSessionDays });
+const auth = createAuthService({ store: createMongoAuthStore(), sessions, config });
 const metrics = createMetrics({ store: createMongoStatStore(), sessions, logger });
 
 const catalogs = createCatalogService({
@@ -82,13 +85,18 @@ const catalogs = createCatalogService({
   }),
   storage,
   metrics,
+  sessions,
   config,
   logger,
 });
-await catalogs.ensureSample();
-// Merchant catalogs are temporary. Sweep once at boot, then hourly.
-catalogs.sweepExpired().catch((err) => logger.error({ err: err.message }, 'catalog sweep failed'));
-setInterval(() => catalogs.sweepExpired().catch((err) => logger.error({ err: err.message }, 'catalog sweep failed')), 3_600_000).unref();
+// The shared catalog: created from data/seedCatalog.json on first boot, and re-applied whenever that file changes.
+// A failure here must not take the API down (shoppers would see "catalog not loaded" and it retries every hour).
+const loadCatalog = () => catalogs.ensureMain().catch((err) => logger.error({ err: err.message }, 'could not load the built-in catalog'));
+await loadCatalog();
+// Private catalogs from before accounts existed are removed when they expire. Sweep once at boot, then hourly.
+const sweep = () => catalogs.sweepExpired().catch((err) => logger.error({ err: err.message }, 'catalog sweep failed'));
+sweep();
+setInterval(() => { sweep(); loadCatalog(); }, 3_600_000).unref();
 
 if (!config.shareSecret) logger.warn('SHARE_SECRET is not set: share links use a random secret and stop working when the server restarts');
 
@@ -97,7 +105,7 @@ const purger = createPurger({ sessions, storage, gateway, ledger, logger, delete
 
 const dbStates = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
 const app = createApp({
-  config, logger, gateway, ledger, storage, queue, sessions, catalogs, metrics, purger,
+  config, logger, gateway, ledger, storage, queue, sessions, auth, catalogs, metrics, purger,
   dbState: () => dbStates[mongoose.connection.readyState] ?? 'unknown',
 });
 

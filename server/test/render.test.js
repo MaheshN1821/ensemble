@@ -5,6 +5,7 @@ import { createMemoryLedger } from '../src/services/ledger.js';
 import { createImporter } from '../src/services/catalog/importer.js';
 import { createCatalogService } from '../src/services/catalog/service.js';
 import { createMemoryCatalogRepo } from '../src/services/catalog/repoMemory.js';
+import { seedFixture } from './fixtures/seedFixture.js';
 import { createSkinService } from '../src/services/skin/service.js';
 import { createRenderService } from '../src/services/render/service.js';
 import { createShareTokens } from '../src/services/render/share.js';
@@ -36,8 +37,9 @@ function fakeGateway() {
 async function boot({ budgetInr = 25000 } = {}) {
   const storage = createMemoryStorage();
   const config = { sessionUnitCap: 50, globalDailyUnitCap: 100, publicClientUrl: 'https://app.test', render: {}, shareSecret: 'test-secret-test-secret' };
-  const catalogs = createCatalogService({ repo: createMemoryCatalogRepo(), importer: createImporter({ fetcher: {}, storage, logger: silentLogger }), storage, config, logger: silentLogger });
-  await catalogs.ensureSample();
+  const repo = createMemoryCatalogRepo();
+  const catalogs = createCatalogService({ repo, importer: createImporter({ fetcher: {}, storage, logger: silentLogger }), storage, config, logger: silentLogger });
+  await seedFixture(repo);
   const sessions = createMemorySessions();
   const d = sessions.docs.get('sess-1');
   d.consent = { over18: true, ownPhotos: false };

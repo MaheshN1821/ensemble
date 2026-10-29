@@ -33,6 +33,8 @@ export function createLimiters({ config, logger }) {
     renders: make('renders', HOUR, l.rendersPerHour, 'Lots of looks have been drawn from this network this hour. Looks already drawn stay available. Try again a little later.'),
     agent: make('agent', HOUR, l.agentTurnsPerHour, 'You have asked for a lot of changes this hour. Try again a little later.'),
     share: make('share', MIN, l.shareViewsPerMinute, 'Too many views of shared looks. Try again in a moment.'),
+    login: make('login', 15 * MIN, l.loginsPer15Min, 'Too many sign-in attempts from this network. Wait a few minutes and try again.'),
+    register: make('register', HOUR, l.registrationsPerHour, 'Too many accounts were created from this network. Try again later.'),
     stats: make('stats', MIN, l.statsPerMinute, 'Too many requests for usage numbers. Try again in a moment.'),
   };
 }

@@ -6,7 +6,7 @@ function Thumb({ item }) {
   return (
     <img
       src={item.imageUrl}
-      alt={`${item.name}${item.source === 'sample' ? ' (sample illustration)' : ''}`}
+      alt={item.name}
       className="size-full object-contain p-2"
       loading="lazy"
     />
@@ -53,7 +53,6 @@ export default function LookCard({ look, scoreNote, label, onTryBudget, closest 
       <div className="grid grid-cols-[1fr_5.5rem] gap-px bg-line">
         <div className="relative aspect-[4/5] bg-white">
           <Thumb item={outfit} />
-          {outfit.source === 'sample' && <span className="absolute left-3 top-3 rounded-full bg-ink px-2.5 py-1 text-[12px] font-medium text-white">Sample</span>}
         </div>
         <ul className="flex flex-col gap-px bg-line" aria-label="Jewellery and lipstick">
           {small.map((i) => <li key={i.id} className="flex-1 bg-white"><Thumb item={i} /></li>)}

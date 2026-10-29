@@ -2,20 +2,18 @@ import mongoose from 'mongoose';
 
 const colour = new mongoose.Schema({ hex: String, family: String, share: Number }, { _id: false });
 
-// A catalog is either the built-in sample or a retailer's import. Retailers have no accounts: two random tokens
-// act as links, and only their hashes are stored. `share` lets shoppers use the catalog; `manage` also edits it
-// and shows the dashboard. Neither is recoverable, so the retailer is shown them once.
+// There is one shared catalog ('main'). Every shopper plans from it and every retailer's items are stored in it, so
+// nothing depends on a private link. (Older private catalogs from before accounts may still exist until they expire;
+// the catalog service sweeps them.)
 const catalogSchema = new mongoose.Schema(
   {
     _id: { type: String, required: true },
     name: { type: String, required: true },
-    source: { type: String, enum: ['sample', 'merchant'], required: true },
-    version: { type: String, default: null }, // sample catalog only: which seed produced it
-    shareHash: { type: String, default: null, index: { unique: true, sparse: true } },
-    manageHash: { type: String, default: null, index: { unique: true, sparse: true } },
+    source: { type: String, enum: ['main', 'merchant'], required: true },
+    version: { type: String, default: null }, // main catalog: fingerprint of the seed file last applied
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
-    expiresAt: { type: Date, default: null, index: true }, // merchant catalogs only. Swept by the catalog service, not a TTL index, so stored images are deleted too.
+    expiresAt: { type: Date, default: null, index: true }, // legacy private catalogs only
   },
   { versionKey: false },
 );
@@ -23,7 +21,12 @@ const catalogSchema = new mongoose.Schema(
 const itemSchema = new mongoose.Schema(
   {
     catalogId: { type: String, required: true },
-    itemId: { type: String, required: true },
+    itemId: { type: String, required: true }, // unique in the catalog. A retailer's own id is prefixed with their code.
+    sku: { type: String, default: null }, // the id exactly as the retailer wrote it (without the prefix)
+    origin: { type: String, enum: ['seed', 'retailer'], default: 'retailer' },
+    retailerId: { type: String, default: null, index: true }, // the owning account. null for the built-in items
+    retailerName: { type: String, default: null }, // shown to shoppers as "Sold by"
+    uploadId: { type: String, default: null, index: true }, // the latest upload that wrote this item
     type: { type: String, enum: ['outfit', 'necklace', 'earrings', 'lipstick'], required: true },
     name: { type: String, required: true },
     price: { type: Number, required: true },

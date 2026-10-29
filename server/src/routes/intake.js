@@ -91,6 +91,7 @@ export function intakeRoutes({ config, sessions, storage, logger, renders, agent
       consent,
       photos: { selfie, body },
       preferences,
+      storeCode: s.storeCode ?? null,
       complete: Boolean(consent?.over18 && selfie && body && preferences),
     };
   };

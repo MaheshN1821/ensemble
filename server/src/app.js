@@ -9,6 +9,11 @@ import { sessionRoutes } from './routes/sessions.js';
 import { intakeRoutes } from './routes/intake.js';
 import { skinRoutes } from './routes/skin.js';
 import { catalogRoutes } from './routes/catalog.js';
+import { authRoutes } from './routes/auth.js';
+import { retailerRoutes } from './routes/retailer.js';
+import { accountRoutes } from './routes/account.js';
+import { createAuthService } from './services/auth/service.js';
+import { createMemoryAuthStore } from './services/auth/storeMemory.js';
 import { plannerRoutes } from './routes/planner.js';
 import { renderRoutes } from './routes/render.js';
 import { agentRoutes } from './routes/agent.js';
@@ -24,7 +29,6 @@ import { createSafeFetcher } from './lib/safeFetch.js';
 import { LIMITS } from './config/catalog.js';
 import { LIMITS as RENDER_LIMITS } from './config/render.js';
 import { devRoutes } from './routes/dev.js';
-import { statsRoutes } from './routes/stats.js';
 import { createMetrics } from './services/metrics/service.js';
 import { createMemoryStatStore } from './services/metrics/storeMemory.js';
 import { createPurger } from './services/privacy/purge.js';
@@ -68,7 +72,7 @@ export function createApp(deps) {
         if (!origin || config.clientOrigins.includes(origin)) return cb(null, true);
         return cb(null, false);
       },
-      allowedHeaders: ['Content-Type', 'X-Session-Id', 'X-Request-Id', 'X-Catalog-Token'],
+      allowedHeaders: ['Content-Type', 'X-Session-Id', 'X-Request-Id', 'Authorization'],
       exposedHeaders: ['X-Request-Id'],
       maxAge: 600,
     }),
@@ -83,7 +87,6 @@ export function createApp(deps) {
   app.post('/api/sessions/me/looks/:lookId/render', limiters.renders);
   app.post('/api/sessions/me/agent/turn', limiters.agent);
   app.use('/api/share', limiters.share);
-  app.use(['/api/catalogs/mine/stats', '/api/catalogs/mine/stats.csv', '/api/catalog/sample/stats', '/api/catalog/sample/stats.csv'], limiters.stats);
 
   app.use(sessionRoutes(deps));
   // Services first: the intake routes tell the render service when a photo changes.
@@ -107,8 +110,12 @@ export function createApp(deps) {
   app.use(systemRoutes({ ...deps, purger }));
   app.use(intakeRoutes({ ...deps, renders, agent, purger }));
   app.use(skinRoutes({ ...deps, skin }));
-  app.use(catalogRoutes({ ...deps, catalogs, metrics }));
-  app.use(statsRoutes({ ...deps, catalogs, metrics }));
+  // Accounts. Tests pass their own auth service; production passes one built over Mongo in index.js.
+  const auth = deps.auth ?? createAuthService({ store: createMemoryAuthStore(), sessions: deps.sessions, config });
+  app.use(catalogRoutes({ ...deps, catalogs }));
+  app.use(authRoutes({ ...deps, auth, catalogs, purger, limiters }));
+  app.use(retailerRoutes({ ...deps, auth, catalogs, metrics, limiters }));
+  app.use(accountRoutes({ ...deps, auth, skin }));
   app.use(plannerRoutes({ ...deps, planner }));
   app.use(renderRoutes({ ...deps, renders }));
   app.use(agentRoutes({ ...deps, agent }));

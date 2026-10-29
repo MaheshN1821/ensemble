@@ -36,7 +36,7 @@ export default function Review({ config, state, onEdit, onBack, onConfirm }) {
       <p className="mt-4 max-w-[52ch] text-[17px] leading-relaxed text-ink-soft">
         {sample
           ? 'You are using a sample model, so none of your own photos are sent anywhere.'
-          : 'When you continue, your photos are sent to the YouCam API to read your skin tone. They are deleted within 24 hours.'}
+          : 'When you continue, your photos are sent to the YouCam API to read your skin tone. They are deleted within 24 hours, or kept in your account if you have one.'}
       </p>
 
       <dl className="mt-9 border-t border-line">

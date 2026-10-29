@@ -28,11 +28,13 @@ export const STYLES = [
   { id: 'fusion', label: 'Fusion' },
 ];
 
-export const SOURCES = ['sample', 'merchant'];
+// There is one shared catalog. Every shopper plans from it, and every retailer's items live in it.
+export const MAIN_CATALOG_ID = 'main';
+export const MAIN_CATALOG_NAME = 'Ensemble catalog';
 
 export const LIMITS = {
   maxRowsPerImport: 60, // each row means one image download, so keep one request well under a minute
-  maxItemsPerCatalog: 200,
+  maxItemsPerRetailer: 500, // per retailer account, across all of their uploads
   maxFileBytes: 512 * 1024, // the CSV/JSON text itself
   maxImageBytes: 8 * 1024 * 1024,
   imageTimeoutMs: 8000,
@@ -43,7 +45,6 @@ export const LIMITS = {
   maxOccasionTags: 8,
   maxColours: 3,
   price: { min: 50, max: 1_000_000 }, // rupees
-  catalogTtlDays: 30, // merchant catalogs are temporary too; the sample catalog never expires
 };
 
 // Image checks per item type (FR-14). `min*` failures reject the row, the rest only warn.
@@ -78,10 +79,9 @@ export const publicCatalogConfig = () => ({
   occasions: OCCASIONS,
   limits: {
     maxRowsPerImport: LIMITS.maxRowsPerImport,
-    maxItemsPerCatalog: LIMITS.maxItemsPerCatalog,
+    maxItemsPerRetailer: LIMITS.maxItemsPerRetailer,
     maxFileBytes: LIMITS.maxFileBytes,
     price: LIMITS.price,
-    catalogTtlDays: LIMITS.catalogTtlDays,
   },
   imageRules: Object.fromEntries(Object.entries(IMAGE_RULES).map(([k, v]) => [k, { minShortSide: v.minShortSide, note: v.note }])),
 });

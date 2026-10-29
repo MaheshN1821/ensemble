@@ -53,27 +53,40 @@ async function mapLimit(list, limit, fn) {
  * Row-level problems never stop the import: valid rows come through, invalid ones are listed with what to fix.
  */
 export function createImporter({ fetcher, storage, logger }) {
-  async function processImage(item, catalogId) {
+  /**
+   * `store: false` keeps the image where it already is (the built-in catalog's photos are hosted already).
+   * `lenient: true` is for that trusted file only: a photo that cannot be fetched or fails a size check still lets the item in,
+   * with a warning, so a network blip at boot cannot leave the catalog empty.
+   */
+  async function processImage(item, catalogId, { store = true, lenient = false } = {}) {
     const errors = [];
     const warnings = [];
+    const fallback = (message) => {
+      const colourSource = item.colourSource === 'pending' ? 'none' : item.colourSource;
+      return { item: { ...item, sourceImageUrl: item.imageUrl, colourSource }, errors: [], warnings: [...warnings, { field: 'image_url', message }] };
+    };
     let downloaded;
     try {
       downloaded = await fetcher.fetchImage(item.imageUrl);
     } catch (e) {
       const msg = e instanceof FetchRefused ? e.message : 'Could not download the image.';
       if (!(e instanceof FetchRefused)) logger?.warn({ err: e.message }, 'catalog image fetch failed');
+      if (lenient) return fallback(`${msg} The item was added without reading its photo.`);
       return { errors: [{ field: 'image_url', message: msg }], warnings };
     }
     const check = checkImage(downloaded.buffer, item.type);
     warnings.push(...check.warnings);
-    if (check.errors.length) return { errors: check.errors, warnings };
+    if (check.errors.length) {
+      if (lenient) return fallback(check.errors.map((e) => e.message).join(' '));
+      return { errors: check.errors, warnings };
+    }
 
     const next = { ...item, sourceImageUrl: item.imageUrl, imageWidth: check.info.width, imageHeight: check.info.height };
     let colours = item.colours;
     let colourSource = item.colourSource;
     if (colourSource === 'pending' && check.pixels?.colours.length) { colours = check.pixels.colours; colourSource = 'image'; }
 
-    if (storage?.isConfigured?.()) {
+    if (store && storage?.isConfigured?.()) {
       try {
         const saved = await storage.saveCatalogImage({ catalogId, itemId: item.itemId, buffer: downloaded.buffer });
         next.imageUrl = saved.url;
@@ -94,8 +107,12 @@ export function createImporter({ fetcher, storage, logger }) {
     return { item: { ...next, colours, colourSource }, errors, warnings };
   }
 
-  /** @param rows raw rows from parseRows. @param existingIds ids already in the catalog (for replace-vs-update wording) */
-  async function run({ rows, catalogId, existingIds = new Set() }) {
+  /**
+   * @param rows raw rows from parseRows.
+   * @param existingIds ids this retailer already has in the catalog, prefix included (for add-vs-update wording).
+   * @param idPrefix put in front of every item id so two retailers can both use "SKU-1". Reports show the id as written.
+   */
+  async function run({ rows, catalogId, existingIds = new Set(), idPrefix = '', store = true, lenient = false }) {
     const report = rows.map((raw, i) => ({ line: raw.__line ?? i + 1, id: null, name: null, status: 'rejected', updated: false, errors: [], warnings: [] }));
     const staged = [];
     const seen = new Map();
@@ -105,17 +122,18 @@ export function createImporter({ fetcher, storage, logger }) {
       report[i].warnings.push(...v.warnings);
       report[i].name = v.item?.name ?? (String(raw.name ?? raw.title ?? '').trim() || null);
       if (!v.item) { report[i].errors.push(...v.errors); return; }
-      report[i].id = v.item.itemId;
-      if (seen.has(v.item.itemId)) {
-        report[i].errors.push({ field: 'id', message: `This id is already used on line ${report[seen.get(v.item.itemId)].line}. Give each item its own id.` });
+      const sku = v.item.itemId;
+      report[i].id = sku;
+      if (seen.has(sku)) {
+        report[i].errors.push({ field: 'id', message: `This id is already used on line ${report[seen.get(sku)].line}. Give each item its own id.` });
         return;
       }
-      seen.set(v.item.itemId, i);
-      staged.push({ i, item: v.item });
+      seen.set(sku, i);
+      staged.push({ i, item: { ...v.item, sku, itemId: `${idPrefix}${sku}` } });
     });
 
     await mapLimit(staged, LIMITS.imageConcurrency, async ({ i, item }) => {
-      const res = await processImage(item, catalogId);
+      const res = await processImage(item, catalogId, { store, lenient });
       report[i].warnings.push(...res.warnings);
       if (res.errors.length) { report[i].errors.push(...res.errors); return; }
       report[i].status = 'imported';

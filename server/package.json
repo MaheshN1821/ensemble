@@ -7,8 +7,7 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "test": "node --test \"test/*.test.js\"",
-    "assets": "node scripts/generate-sample-assets.js"
+    "test": "node --test \"test/*.test.js\""
   },
   "dependencies": {
     "cloudinary": "^2.5.1",

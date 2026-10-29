@@ -1,21 +1,29 @@
-import { createHash, randomBytes } from 'node:crypto';
-import { LIMITS } from '../../config/catalog.js';
+import { randomBytes } from 'node:crypto';
+import { LIMITS, MAIN_CATALOG_ID, MAIN_CATALOG_NAME } from '../../config/catalog.js';
 import { AppError } from '../../lib/errors.js';
-import { SAMPLE_CATALOG_ID, SAMPLE_CATALOG_VERSION, SAMPLE_ITEMS } from '../../data/sampleCatalog.js';
+import { SEED_ROWS, SEED_VERSION } from '../../data/seed.js';
 
-const hash = (token) => createHash('sha256').update(token).digest('hex');
-const newToken = (prefix) => `${prefix}_${randomBytes(24).toString('base64url')}`;
 const newId = () => randomBytes(9).toString('base64url');
-const NOT_FOUND = () => new AppError('CATALOG_NOT_FOUND', 'That catalog link does not work. It may have expired or been deleted. Check the link or ask the retailer for a new one.', 404);
+const LEGACY_SAMPLE_ID = 'sample'; // the old built-in 30-item sample catalog, removed at boot
+const MAX_STORED_PROBLEMS = 100;
+const countByType = (list) => list.reduce((acc, i) => ({ ...acc, [i.type]: (acc[i.type] ?? 0) + 1 }), { outfit: 0, necklace: 0, earrings: 0, lipstick: 0 });
+const cleanFileName = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
 
-export function createCatalogService({ repo, importer, storage, metrics, config = {}, logger, now = () => new Date() }) {
-  const ttlMs = (config.catalogTtlDays ?? LIMITS.catalogTtlDays) * 86_400_000;
+/**
+ * The shared catalog.
+ *
+ * There is exactly one catalog ('main'). It starts from data/seedCatalog.json, and every retailer's uploaded items are added
+ * to it, so shoppers see them with no link to share. Each retailer item carries its owner, so a retailer can list, update
+ * and delete only their own items. Deleting an item removes its database record, its stored image and its usage counters.
+ */
+export function createCatalogService({ repo, importer, storage, metrics, sessions, config = {}, logger, now = () => new Date(), seed = { rows: SEED_ROWS, version: SEED_VERSION } }) {
   const publicBase = (config.publicClientUrl ?? '').replace(/\/$/, '');
 
-  /** What other code and the API see. Relative sample image paths become absolute so the server can fetch them at render time. */
-  const presentItem = (item, catalog) => ({
+  /** What other code and the API see. Relative image paths (older data) become absolute so the server can fetch them. */
+  const presentItem = (item) => ({
     id: item.itemId,
     catalogId: item.catalogId,
+    sku: item.sku ?? item.itemId,
     type: item.type,
     name: item.name,
     price: item.price,
@@ -29,139 +37,266 @@ export function createCatalogService({ repo, importer, storage, metrics, config 
     productUrl: item.productUrl ?? null,
     style: item.style ?? null,
     silhouette: item.silhouette ?? null,
-    source: catalog.source === 'sample' ? 'sample' : 'merchant',
+    source: item.retailerId ? 'retailer' : 'house',
+    seller: item.retailerName || 'Ensemble',
   });
 
-  const presentCatalog = (catalog, itemCount, role = 'viewer') => ({
+  const presentOwnItem = (item) => ({ ...presentItem(item), uploadId: item.uploadId ?? null, addedAt: item.addedAt ?? null });
+
+  const presentCatalog = (catalog, list) => ({
     id: catalog._id,
     name: catalog.name,
     source: catalog.source,
-    role,
-    itemCount,
-
-    expiresAt: catalog.expiresAt ?? null,
+    itemCount: list.length,
+    counts: countByType(list),
+    sellers: [...new Set(list.map((i) => i.retailerName || 'Ensemble'))].sort((a, b) => a.localeCompare(b)),
   });
 
-  const withItems = async (catalog, role) => {
-    const list = await repo.listItems(catalog._id);
-    const counts = list.reduce((acc, i) => ({ ...acc, [i.type]: (acc[i.type] ?? 0) + 1 }), { outfit: 0, necklace: 0, earrings: 0, lipstick: 0 });
-    return { catalog: { ...presentCatalog(catalog, list.length, role), counts }, items: list.map((i) => presentItem(i, catalog)) };
+  const presentUpload = (u, itemsNow) => ({
+    id: u._id,
+    fileName: u.fileName ?? '',
+    mode: u.mode,
+    status: u.status,
+    createdAt: u.createdAt,
+    totals: u.totals ?? {},
+    problemCount: (u.problems ?? []).length,
+    itemsNow,
+  });
+
+  /** Items a retailer owns. Their ids all start with the retailer's code and a dash, and only retailer items have an owner. */
+  const storeItems = (list, code) => {
+    const c = String(code ?? '').toLowerCase();
+    return /^[a-z0-9]{2,12}$/.test(c) ? list.filter((i) => i.source === 'retailer' && i.id.startsWith(`${c}-`)) : [];
   };
 
-  async function ensureSample() {
-    const existing = await repo.getCatalog(SAMPLE_CATALOG_ID);
-    const count = existing ? await repo.countItems(SAMPLE_CATALOG_ID) : 0;
-    if (existing?.version === SAMPLE_CATALOG_VERSION && count === SAMPLE_ITEMS.length) return { seeded: false };
-    await repo.upsertCatalog({ _id: SAMPLE_CATALOG_ID, name: 'Sample catalog', source: 'sample', version: SAMPLE_CATALOG_VERSION, updatedAt: now() });
-    await repo.deleteItems(SAMPLE_CATALOG_ID);
-    await repo.upsertItems(SAMPLE_CATALOG_ID, SAMPLE_ITEMS.map(({ prompt, ...item }) => ({ ...item, addedAt: now() })));
-    logger?.info({ items: SAMPLE_ITEMS.length, version: SAMPLE_CATALOG_VERSION }, 'sample catalog seeded');
-    return { seeded: true };
+  const withItems = async (catalog) => {
+    const list = await repo.listItems(catalog._id);
+    return { catalog: presentCatalog(catalog, list), items: list.map(presentItem) };
+  };
+
+  // ---- Boot: the built-in catalog ------------------------------------------------------------------------------
+
+  /**
+   * Makes sure the shared catalog exists and holds the seed file's items. Removes the old 30-item sample catalog. Safe to run
+   * at every boot: when the seed file has not changed (and every item came in cleanly) nothing is touched.
+   */
+  async function ensureMain() {
+    const legacy = await repo.getCatalog(LEGACY_SAMPLE_ID);
+    if (legacy) { await deleteCatalogData(LEGACY_SAMPLE_ID); logger?.info('old sample catalog removed'); }
+
+    const t = now();
+    let main = await repo.getCatalog(MAIN_CATALOG_ID);
+    if (!main) main = await repo.upsertCatalog({ _id: MAIN_CATALOG_ID, name: MAIN_CATALOG_NAME, source: 'main', version: null, createdAt: t, updatedAt: t, expiresAt: null });
+    if (main.version === seed.version) return { seeded: false };
+
+    const rows = seed.rows.map((o, i) => ({ ...o, __line: i + 1 }));
+    const { items, report } = await importer.run({ rows, catalogId: MAIN_CATALOG_ID, store: false, lenient: true });
+    if (report.totals.rejected) logger?.warn({ rejected: report.rows.filter((r) => r.status === 'rejected').map((r) => ({ line: r.line, errors: r.errors })) }, 'some seed rows were rejected');
+
+    // Never overwrite a retailer's item that happens to share an id with a seed item.
+    const taken = await repo.itemIds(MAIN_CATALOG_ID);
+    const seedIds = await repo.seedItemIds(MAIN_CATALOG_ID);
+    const fresh = items.filter((i) => !taken.has(i.itemId) || seedIds.has(i.itemId));
+    const keep = new Set(fresh.map((i) => i.itemId));
+    const stale = [...seedIds].filter((id) => !keep.has(id));
+    if (stale.length) await repo.deleteItems(MAIN_CATALOG_ID, stale);
+    await repo.upsertItems(MAIN_CATALOG_ID, fresh.map((i) => ({ ...i, origin: 'seed', retailerId: null, retailerName: null, uploadId: null, addedAt: t })));
+
+    // A seed photo that could not be read stays flagged, so the next boot tries again instead of trusting a half-read item.
+    const clean = report.totals.rejected === 0 && !report.rows.some((r) => r.warnings.some((w) => w.field === 'image_url'));
+    await repo.updateCatalog(MAIN_CATALOG_ID, { version: clean ? seed.version : `${seed.version}!retry`, updatedAt: t });
+    logger?.info({ items: fresh.length, removed: stale.length, clean }, 'built-in catalog applied');
+    return { seeded: true, items: fresh.length, clean };
   }
 
-  async function resolve(token, { need = 'view' } = {}) {
-    if (typeof token !== 'string' || token.length < 20 || token.length > 100) throw NOT_FOUND();
-    const catalog = await repo.findByHash(hash(token));
-    if (!catalog || (catalog.expiresAt && catalog.expiresAt <= now())) throw NOT_FOUND();
-    const role = catalog.manageHash === hash(token) ? 'owner' : 'viewer';
-    if (need === 'manage' && role !== 'owner') throw new AppError('CATALOG_FORBIDDEN', 'This is the shopper link. Use your private manage link to change the catalog.', 403);
-    return { catalog, role };
+  /** The shared catalog's record. Created empty if it is missing, so reading never fails just because seeding has not run yet. */
+  async function mainCatalog() {
+    const catalog = await repo.getCatalog(MAIN_CATALOG_ID);
+    if (catalog) return catalog;
+    const t = now();
+    return repo.upsertCatalog({ _id: MAIN_CATALOG_ID, name: MAIN_CATALOG_NAME, source: 'main', version: null, createdAt: t, updatedAt: t, expiresAt: null });
   }
 
-  const touch = (catalogId) => repo.updateCatalog(catalogId, { updatedAt: now(), expiresAt: new Date(now().getTime() + ttlMs) });
+  // ---- Retailer-owned items ------------------------------------------------------------------------------------
+
+  /** Deletes items one at a time: stored image first, then the record, so a storage failure leaves the item in place to retry. */
+  async function purgeItems(list) {
+    const removed = [];
+    try {
+      for (const item of list) {
+        if (item.imagePublicId) await storage?.deleteCatalogImage?.(item.imagePublicId);
+        await repo.deleteItem(MAIN_CATALOG_ID, item.itemId);
+        removed.push(item.itemId);
+      }
+    } catch (e) {
+      logger?.error({ err: e.message }, 'catalog item delete failed');
+      await afterRemoved(removed);
+      throw new AppError('DELETE_FAILED', 'We could not remove an image just now. Nothing else was lost. Try again in a moment.', 502, { removed: removed.length });
+    }
+    await afterRemoved(removed);
+    return removed;
+  }
+
+  /** Everything else that remembers an item id: usage counters and shoppers' "never show me this" lists. */
+  async function afterRemoved(ids) {
+    if (!ids.length) return;
+    await Promise.allSettled([metrics?.removeItems?.(MAIN_CATALOG_ID, ids), sessions?.dropExcludedItems?.(ids)]);
+    await repo.updateCatalog(MAIN_CATALOG_ID, { updatedAt: now() });
+  }
+
+  async function dashboard(account) {
+    const rid = account._id;
+    const [items, uploads, counts] = await Promise.all([
+      repo.listItemsByRetailer(MAIN_CATALOG_ID, rid),
+      repo.listUploads(rid, 100),
+      repo.itemCountsByUpload(MAIN_CATALOG_ID, rid),
+    ]);
+    return {
+      store: { code: account.retailer?.code ?? null },
+      summary: { items: items.length, counts: countByType(items), uploads: uploads.length, limit: LIMITS.maxItemsPerRetailer },
+      items: items.map(presentOwnItem),
+      uploads: uploads.map((u) => presentUpload(u, counts[u._id] ?? 0)),
+    };
+  }
+
+  const retailerOf = (account) => {
+    if (account?.role !== 'retailer' || !account.retailer?.code) throw new AppError('FORBIDDEN', 'This needs a retailer account.', 403);
+    return account.retailer;
+  };
+
+  async function recordUpload(account, { uploadId, fileName, format, mode, status, report, removed = 0 }) {
+    const problems = report.rows
+      .filter((r) => r.status === 'rejected' || r.warnings.length)
+      .slice(0, MAX_STORED_PROBLEMS)
+      .map((r) => ({ line: r.line, id: r.id, name: r.name, status: r.status, updated: r.updated, errors: r.errors, warnings: r.warnings }));
+    return repo.insertUpload({
+      _id: uploadId, retailerId: account._id, fileName: cleanFileName(fileName), format, mode, status, createdAt: now(),
+      totals: { ...report.totals, removed }, problems,
+    });
+  }
 
   return {
-    ensureSample,
+    ensureMain,
     presentItem,
 
-    async getSample() {
-      const catalog = await repo.getCatalog(SAMPLE_CATALOG_ID);
-      if (!catalog) throw new AppError('CATALOG_NOT_FOUND', 'The sample catalog is not loaded yet. Try again in a moment.', 503);
-      return withItems(catalog, 'viewer');
+    /** The shared catalog, for anyone. */
+    async getMain() { return withItems(await mainCatalog()); },
+
+    /**
+     * For the planner, agent and renderer: the items a session plans from. Normally the whole shared catalog, so one look can mix
+     * a dress from one retailer with a necklace from another. A session that opened a retailer's store link plans only from that
+     * retailer's items; if the store has nothing left it falls back to the whole catalog (`fellBack: true`).
+     */
+    async itemsForSession(session) {
+      const all = await withItems(await mainCatalog());
+      const code = session?.storeCode;
+      if (!code) return { catalog: all.catalog, items: all.items, fellBack: false };
+      const items = storeItems(all.items, code);
+      if (!items.length) return { catalog: all.catalog, items: all.items, fellBack: true };
+      return { catalog: { ...all.catalog, name: items[0].seller, itemCount: items.length, counts: countByType(items), sellers: [items[0].seller] }, items, fellBack: false };
     },
 
-    async open(token) {
-      const { catalog, role } = await resolve(token);
-      return withItems(catalog, role);
+    /** A retailer's public store: the name and every item they have in the catalog. Anyone with the code can open it. */
+    async getStore(code) {
+      const { items } = await withItems(await mainCatalog());
+      const own = storeItems(items, code);
+      if (!own.length) throw new AppError('STORE_NOT_FOUND', 'We could not find that store, or it has no items right now.', 404);
+      return { store: { code, name: own[0].seller, itemCount: own.length, counts: countByType(own) }, items: own };
     },
 
-    /** Like open, but only the manage link works. Used by the retailer view. */
-    async openOwned(token) {
-      const { catalog, role } = await resolve(token, { need: 'manage' });
-      return withItems(catalog, role);
-    },
+    dashboard,
 
-    /** Creates a retailer catalog from an uploaded file. Valid rows are imported at once; invalid ones are reported. */
-    async createFromImport({ name, format, content }) {
-      const cleanName = String(name ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
-      if (cleanName.length < 2 || cleanName.length > LIMITS.catalogNameMax) throw new AppError('INVALID_INPUT', `Give the catalog a name of 2 to ${LIMITS.catalogNameMax} characters.`, 400, { field: 'name' });
-      const parsed = importer.parseRows({ format, content });
-      const catalogId = newId();
-      const { items, report } = await importer.run({ rows: parsed.rows, catalogId });
-      if (!items.length) {
-        await storage?.deleteCatalog?.(catalogId).catch(() => {});
-        throw new AppError('IMPORT_REJECTED', 'None of the rows could be imported. Fix the problems below and upload again.', 422, { report });
-      }
-      const tokens = { share: newToken('ensc'), manage: newToken('ensm') };
-      const t = now();
-      const catalog = await repo.insertCatalog({
-        _id: catalogId, name: cleanName, source: 'merchant', shareHash: hash(tokens.share), manageHash: hash(tokens.manage),
-        createdAt: t, updatedAt: t, expiresAt: new Date(t.getTime() + ttlMs),
-      });
-      await repo.upsertItems(catalogId, items.map((i) => ({ ...i, addedAt: t })));
-      logger?.info({ catalogId, imported: items.length, rejected: report.totals.rejected }, 'catalog created');
-      return { ...(await withItems(catalog, 'owner')), tokens, report };
-    },
+    /** A retailer's items and upload history. */
+    async openDashboard(account) { retailerOf(account); return dashboard(account); },
 
-    /** Adds to (or replaces) an existing catalog. `append` updates items with the same id and adds new ones. */
-    async importInto(token, { format, content, mode = 'append' }) {
-      const { catalog } = await resolve(token, { need: 'manage' });
+    /**
+     * Adds a file's items to the shared catalog under this retailer. `append` updates items with the same id and adds new ones;
+     * `replace` also removes this retailer's items that are not in the file. Valid rows are live at once; bad rows are reported.
+     */
+    async importForRetailer(account, { format, content, mode = 'append', fileName = '' }) {
+      const retailer = retailerOf(account);
       if (mode !== 'append' && mode !== 'replace') throw new AppError('INVALID_INPUT', 'Mode must be append or replace.', 400, { field: 'mode' });
       const parsed = importer.parseRows({ format, content });
-      const existing = await repo.itemIds(catalog._id);
-      const { items, report } = await importer.run({ rows: parsed.rows, catalogId: catalog._id, existingIds: existing });
-      if (!items.length) throw new AppError('IMPORT_REJECTED', 'None of the rows could be imported. Fix the problems below and upload again.', 422, { report });
+      const prefix = `${retailer.code}-`;
+      const existing = await repo.itemIdsByRetailer(MAIN_CATALOG_ID, account._id);
+      const uploadId = newId();
+      const { items, report } = await importer.run({ rows: parsed.rows, catalogId: MAIN_CATALOG_ID, existingIds: existing, idPrefix: prefix });
+
+      if (!items.length) {
+        await recordUpload(account, { uploadId, fileName, format: parsed.format, mode, status: 'rejected', report });
+        throw new AppError('IMPORT_REJECTED', 'None of the rows could be imported. Fix the problems below and upload again.', 422, { report, uploadId });
+      }
 
       const incoming = new Set(items.map((i) => i.itemId));
       const finalCount = mode === 'replace' ? incoming.size : new Set([...existing, ...incoming]).size;
-      if (finalCount > LIMITS.maxItemsPerCatalog) {
+      if (finalCount > LIMITS.maxItemsPerRetailer) {
         // Remove only images stored for this attempt that no existing item uses.
         for (const it of items) if (it.imagePublicId && !existing.has(it.itemId)) await storage?.deleteCatalogImage?.(it.imagePublicId).catch(() => {});
-        throw new AppError('CATALOG_FULL', `A catalog holds up to ${LIMITS.maxItemsPerCatalog} items. This import would make ${finalCount}. Remove some items first.`, 409, { max: LIMITS.maxItemsPerCatalog });
+        throw new AppError('CATALOG_FULL', `You can have up to ${LIMITS.maxItemsPerRetailer} items in the catalog. This upload would make ${finalCount}. Delete some items first.`, 409, { max: LIMITS.maxItemsPerRetailer });
       }
+
       let removed = 0;
       if (mode === 'replace') {
-        const gone = [...existing].filter((id) => !incoming.has(id));
-        for (const id of gone) {
-          const old = await repo.getItem(catalog._id, id);
-          if (old?.imagePublicId) await storage?.deleteCatalogImage?.(old.imagePublicId).catch(() => {});
-        }
-        if (gone.length) await repo.deleteItems(catalog._id, gone);
-        removed = gone.length;
+        const gone = [];
+        for (const id of existing) if (!incoming.has(id)) gone.push(await repo.getItem(MAIN_CATALOG_ID, id));
+        removed = (await purgeItems(gone.filter(Boolean))).length;
       }
+
       const t = now();
-      await repo.upsertItems(catalog._id, items.map((i) => ({ ...i, addedAt: t })));
-      const fresh = await touch(catalog._id);
+      await repo.upsertItems(MAIN_CATALOG_ID, items.map((i) => ({
+        ...i, origin: 'retailer', retailerId: account._id, retailerName: retailer.businessName, uploadId, addedAt: t,
+      })));
+      await repo.updateCatalog(MAIN_CATALOG_ID, { updatedAt: t });
       report.totals.removed = removed;
-      return { ...(await withItems(fresh, 'owner')), report };
+      const upload = await recordUpload(account, { uploadId, fileName, format: parsed.format, mode, status: 'imported', report, removed });
+      logger?.info({ retailer: account.retailer.code, uploadId, imported: items.length, rejected: report.totals.rejected, removed }, 'retailer upload added to the catalog');
+      const board = await dashboard(account);
+      return { report, uploadId: upload._id, ...board };
     },
 
-    async removeItem(token, itemId) {
-      const { catalog } = await resolve(token, { need: 'manage' });
-      const item = await repo.getItem(catalog._id, String(itemId));
-      if (!item) throw new AppError('NOT_FOUND', 'That item is not in this catalog.', 404);
-      if (item.imagePublicId) await storage?.deleteCatalogImage?.(item.imagePublicId).catch((e) => logger?.warn({ err: e.message }, 'catalog image delete failed'));
-      await repo.deleteItem(catalog._id, item.itemId);
-      return withItems(catalog, 'owner');
+    /** Delete one of this retailer's items everywhere: catalog, image storage, usage counters, shoppers' exclusion lists. */
+    async removeItem(account, itemId) {
+      retailerOf(account);
+      const item = await repo.getItem(MAIN_CATALOG_ID, String(itemId));
+      if (!item || item.retailerId !== account._id) throw new AppError('NOT_FOUND', 'That item is not in your catalog.', 404);
+      await purgeItems([item]);
+      return dashboard(account);
     },
 
-    async removeCatalog(token) {
-      const { catalog } = await resolve(token, { need: 'manage' });
-      await deleteCatalogData(catalog._id);
-      return { deleted: true };
+    /** Delete every item that this upload last wrote, then the upload's record. Items a later upload updated stay with that upload. */
+    async removeUpload(account, uploadId) {
+      retailerOf(account);
+      const upload = await repo.getUpload(String(uploadId), account._id);
+      if (!upload) throw new AppError('NOT_FOUND', 'That upload was not found.', 404);
+      const items = await repo.listItemsByUpload(MAIN_CATALOG_ID, account._id, upload._id);
+      await purgeItems(items);
+      await repo.deleteUpload(upload._id);
+      return dashboard(account);
     },
 
-    /** Deletes expired merchant catalogs and their stored images. Safe to run often. */
+    /** The stored problems of one upload, for its report. */
+    async uploadReport(account, uploadId) {
+      retailerOf(account);
+      const upload = await repo.getUpload(String(uploadId), account._id);
+      if (!upload) throw new AppError('NOT_FOUND', 'That upload was not found.', 404);
+      const rows = (upload.problems ?? []).map((p) => ({ ...p, errors: p.errors ?? [], warnings: p.warnings ?? [] }));
+      return { upload: presentUpload(upload, 0), report: { totals: { ...upload.totals }, rows } };
+    },
+
+    /** Part of deleting a retailer account: all of their items and upload history go too. */
+    async removeAllForRetailer(account) {
+      retailerOf(account);
+      await purgeItems(await repo.listItemsByRetailer(MAIN_CATALOG_ID, account._id));
+      await repo.deleteUploadsByRetailer(account._id);
+    },
+
+    /** A retailer's own items, for their usage view. */
+    async itemsOf(account) {
+      retailerOf(account);
+      return (await repo.listItemsByRetailer(MAIN_CATALOG_ID, account._id)).map(presentItem);
+    },
+
+    /** Deletes expired private catalogs left over from before accounts existed, and their stored images. Safe to run often. */
     async sweepExpired() {
       const expired = await repo.listExpired(now());
       let swept = 0;
@@ -169,28 +304,6 @@ export function createCatalogService({ repo, importer, storage, metrics, config 
         try { await deleteCatalogData(_id); swept++; } catch (e) { logger?.error({ err: e.message, catalogId: _id }, 'catalog sweep failed'); }
       }
       return { swept };
-    },
-
-    /** For the planner (Stage 5): the items a session should be planned from. Falls back to the sample catalog. */
-    async itemsForSession(session) {
-      const wanted = session?.catalogId || SAMPLE_CATALOG_ID;
-      let catalog = await repo.getCatalog(wanted);
-      let fellBack = false;
-      if (!catalog || (catalog.expiresAt && catalog.expiresAt <= now())) { catalog = await repo.getCatalog(SAMPLE_CATALOG_ID); fellBack = wanted !== SAMPLE_CATALOG_ID; }
-      if (!catalog) throw new AppError('CATALOG_NOT_FOUND', 'No catalog is available yet. Try again in a moment.', 503);
-      const { catalog: info, items } = await withItems(catalog, 'viewer');
-      return { catalog: info, items, fellBack };
-    },
-
-    /** Validates a link for a shopper session and returns what to store on the session. */
-    async selectionFor(token) {
-      const { catalog } = await resolve(token);
-      return { id: catalog._id, name: catalog.name };
-    },
-    async describe(catalogId) {
-      const catalog = await repo.getCatalog(catalogId || SAMPLE_CATALOG_ID);
-      if (!catalog || (catalog.expiresAt && catalog.expiresAt <= now())) return null;
-      return presentCatalog(catalog, await repo.countItems(catalog._id));
     },
   };
 

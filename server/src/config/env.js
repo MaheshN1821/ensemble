@@ -19,9 +19,8 @@ const schema = z.object({
   PORT: z.coerce.number().int().default(8080),
   LOG_LEVEL: z.string().default('info'),
   CLIENT_ORIGINS: z.string().default('http://localhost:5173'),
-  // Public address of the client. Sample catalog images are served from there, so the server needs it to fetch them at render time.
+  // Public address of the client. Sample model photos are served from there, so the server needs it to fetch them at render time.
   PUBLIC_CLIENT_URL: z.string().url().optional(),
-  CATALOG_TTL_DAYS: num(30, 1),
   CATALOG_IMPORTS_PER_HOUR: num(12, 1),
 
   MONGODB_URI: z.string().min(1, 'is required'),
@@ -68,10 +67,16 @@ const schema = z.object({
   LIMIT_AGENT_TURNS_PER_HOUR: num(60, 0),
   LIMIT_SHARE_VIEWS_PER_MINUTE: num(90, 0),
   LIMIT_STATS_PER_MINUTE: num(30, 0),
+  LIMIT_LOGINS_PER_15_MIN: num(20, 0),
+  LIMIT_REGISTRATIONS_PER_HOUR: num(10, 0),
   // How often expired sessions are swept (stored photos, drawn images and YouCam tasks deleted), in minutes.
   SESSION_SWEEP_MINUTES: num(5, 1),
 
   SESSION_TTL_HOURS: num(24, 1),
+  // Accounts (retailers and shoppers). A sign-in token lasts this long after its last use.
+  AUTH_TOKEN_DAYS: num(30, 1),
+  // A signed-in shopper's saved session (photos, skin reading, looks) is kept this long after their last visit.
+  ACCOUNT_SESSION_DAYS: num(365, 1),
   SESSION_UNIT_CAP: num(120, 1),
   GLOBAL_DAILY_UNIT_CAP: num(900, 1),
 
@@ -107,7 +112,8 @@ export function loadEnv(source = process.env) {
     logLevel: e.LOG_LEVEL,
     clientOrigins: e.CLIENT_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean),
     publicClientUrl: e.PUBLIC_CLIENT_URL || e.CLIENT_ORIGINS.split(',')[0].trim(),
-    catalogTtlDays: e.CATALOG_TTL_DAYS,
+    authTokenDays: e.AUTH_TOKEN_DAYS,
+    accountSessionDays: e.ACCOUNT_SESSION_DAYS,
     catalogImportsPerHour: e.CATALOG_IMPORTS_PER_HOUR,
     mongoUri: e.MONGODB_URI,
     youcam: {
@@ -150,6 +156,8 @@ export function loadEnv(source = process.env) {
       agentTurnsPerHour: e.LIMIT_AGENT_TURNS_PER_HOUR,
       shareViewsPerMinute: e.LIMIT_SHARE_VIEWS_PER_MINUTE,
       statsPerMinute: e.LIMIT_STATS_PER_MINUTE,
+      loginsPer15Min: e.LIMIT_LOGINS_PER_15_MIN,
+      registrationsPerHour: e.LIMIT_REGISTRATIONS_PER_HOUR,
     },
     sessionSweepMinutes: e.SESSION_SWEEP_MINUTES,
     sessionTtlHours: e.SESSION_TTL_HOURS,

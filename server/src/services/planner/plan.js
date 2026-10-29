@@ -159,7 +159,7 @@ export function planLooks({ items, profile, prefs, constraints = {} }) {
   const finishPlan = (extra) => ({ ...base, notes, ...extra, plannedInMs: Date.now() - started });
 
   if (!p.outfit.length) {
-    return finishPlan({ status: 'no_items', looks: [], closest: null, relaxed: [], minBudgetInr: null, message: 'This catalog has no outfits to plan from. Add outfits, or use the sample catalog.' });
+    return finishPlan({ status: 'no_items', looks: [], closest: null, relaxed: [], minBudgetInr: null, message: 'This catalog has no outfits to plan from. Ask a retailer to add outfits.' });
   }
   if (JEWELLERY.some((s) => ctx.metalPref && p[s].length && !sets[s].some(Boolean))) {
     const slots = JEWELLERY.filter((s) => p[s].length && !sets[s].some(Boolean)).map((s) => s);

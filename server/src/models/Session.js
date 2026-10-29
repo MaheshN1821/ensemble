@@ -112,8 +112,16 @@ const sessionSchema = new mongoose.Schema(
       type: new mongoose.Schema({ turns: { type: Number, default: 0 }, llmCalls: { type: Number, default: 0 }, excludeItemIds: { type: [String], default: [] } }, { _id: false }),
       default: () => ({}),
     },
+    // Accounts: a signed-in shopper owns one session that outlives the usual day. `accountId` links it; its counters reset daily.
+    accountId: { type: String, default: null },
+    capsResetAt: { type: Date, default: null },
+    skinHistory: {
+      type: [new mongoose.Schema({ analysedAt: Date, source: String, skinHex: String, depth: String, undertone: String }, { _id: false })],
+      default: [],
+    },
     counted: { type: [String], default: [] }, // once-only retailer-counter flags (Stage 9). Flags only, never content.
-    catalogId: { type: String, default: null }, // which catalog the planner uses; null means the sample catalog
+    catalogId: { type: String, default: null }, // which catalog the planner uses; null means the shared catalog
+    storeCode: { type: String, default: null }, // a retailer's store link: when set, suggestions come only from that retailer's items
     preferences: {
       type: new mongoose.Schema(
         {
@@ -136,5 +144,6 @@ const sessionSchema = new mongoose.Schema(
 // (services/privacy/purge.js) deletes stored images and YouCam tasks first, then the document. Expired sessions are
 // already unreachable: sessions.get() ignores them.
 sessionSchema.index({ expiresAt: 1 });
+sessionSchema.index({ accountId: 1 }, { sparse: true });
 
 export const Session = mongoose.models.Session || mongoose.model('Session', sessionSchema);

@@ -6,13 +6,15 @@ import { createMemoryLedger } from '../src/services/ledger.js';
 import { createImporter } from '../src/services/catalog/importer.js';
 import { createCatalogService } from '../src/services/catalog/service.js';
 import { createMemoryCatalogRepo } from '../src/services/catalog/repoMemory.js';
+import { seedFixture } from './fixtures/seedFixture.js';
 import { silentLogger, createMemorySessions, createMemoryStorage } from './helpers.js';
 
 async function boot({ withProfile = true } = {}) {
   const storage = createMemoryStorage();
   const config = { clientOrigins: [], enableDevRoutes: false, sessionUnitCap: 50, globalDailyUnitCap: 100, publicClientUrl: 'https://app.test' };
-  const catalogs = createCatalogService({ repo: createMemoryCatalogRepo(), importer: createImporter({ fetcher: {}, storage, logger: silentLogger }), storage, config, logger: silentLogger });
-  await catalogs.ensureSample();
+  const repo = createMemoryCatalogRepo();
+  const catalogs = createCatalogService({ repo, importer: createImporter({ fetcher: {}, storage, logger: silentLogger }), storage, config, logger: silentLogger });
+  await seedFixture(repo);
   const sessions = createMemorySessions();
   const d = sessions.docs.get('sess-1');
   d.consent = { over18: true, ownPhotos: false };
@@ -39,7 +41,7 @@ test('plan API: three looks within budget, a different budget, and clear errors'
     assert.equal(plan.status, 'ok');
     assert.equal(plan.looks.length, 3);
     assert.ok(plan.looks.every((l) => l.totalPrice <= 25000));
-    assert.equal(plan.catalog.id, 'sample');
+    assert.equal(plan.catalog.id, 'main');
 
     const small = await (await t.post({ budgetInr: 2000 })).json();
     assert.equal(small.status, 'over_budget');

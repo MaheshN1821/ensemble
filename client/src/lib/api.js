@@ -14,10 +14,10 @@ export class ApiError extends Error {
 }
 
 /** Fetch wrapper: JSON in/out, session header, and errors that already carry a user-facing message. */
-export async function api(path, { method = 'GET', body, sessionId, catalogToken, signal } = {}) {
+export async function api(path, { method = 'GET', body, sessionId, authToken, signal } = {}) {
   const headers = {};
   if (sessionId) headers['X-Session-Id'] = sessionId;
-  if (catalogToken) headers['X-Catalog-Token'] = catalogToken;
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
   let payload;
   if (body instanceof FormData) {
     payload = body;
@@ -44,12 +44,12 @@ export async function api(path, { method = 'GET', body, sessionId, catalogToken,
 }
 
 /**
- * Downloads a file the API returns (the usage CSV). A plain link cannot send the private catalog token header, and the
+ * Downloads a file the API returns (the usage CSV). A plain link cannot send the sign-in token header, and the
  * token must not go in the address, so the file is fetched here and handed to the browser as a download.
  */
-export async function apiDownload(path, { catalogToken, sessionId, filename = 'download' } = {}) {
+export async function apiDownload(path, { authToken, sessionId, filename = 'download' } = {}) {
   const headers = {};
-  if (catalogToken) headers['X-Catalog-Token'] = catalogToken;
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
   if (sessionId) headers['X-Session-Id'] = sessionId;
   let res;
   try {
