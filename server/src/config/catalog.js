@@ -9,6 +9,26 @@ export const ITEM_TYPES = [
   { id: 'necklace', label: 'Necklace' },
   { id: 'earrings', label: 'Earrings' },
   { id: 'lipstick', label: 'Lipstick' },
+  { id: 'blush', label: 'Blush' },
+  { id: 'foundation', label: 'Foundation' },
+  { id: 'eyewear', label: 'Eyewear' },
+  { id: 'watch', label: 'Watch' },
+];
+
+export const GENDERS = [
+  { id: 'all', label: 'All' },
+  { id: 'women', label: 'Women' },
+  { id: 'men', label: 'Men' },
+  { id: 'unisex', label: 'Unisex' },
+];
+
+export const OUTFIT_CATEGORIES = [
+  { id: 'all', label: 'All outfits' },
+  { id: 'saree', label: 'Saree & ethnic' },
+  { id: 'party', label: 'Party wear' },
+  { id: 'casual', label: 'Casual' },
+  { id: 'formal', label: 'Formal & suits' },
+  { id: 'festive', label: 'Festive & wedding' },
 ];
 
 // Garment categories supported by the clothes try-on (FR-11). Only outfits carry one.
@@ -26,6 +46,8 @@ export const STYLES = [
   { id: 'traditional', label: 'Traditional' },
   { id: 'contemporary', label: 'Contemporary' },
   { id: 'fusion', label: 'Fusion' },
+  { id: 'casual', label: 'Casual' },
+  { id: 'formal', label: 'Formal' },
 ];
 
 // There is one shared catalog. Every shopper plans from it, and every retailer's items live in it.
@@ -50,9 +72,12 @@ export const LIMITS = {
 // Image checks per item type (FR-14). `min*` failures reject the row, the rest only warn.
 export const IMAGE_RULES = {
   outfit: { minShortSide: 400, minLongSide: 500, minAspect: 0.8, note: 'a front-facing garment photo (flat lay, mannequin or model) at least 400 px wide' },
-  necklace: { minShortSide: 200, minLongSide: 200, minAspect: null, note: 'a clear photo of the necklace on a plain background' },
   earrings: { minShortSide: 200, minLongSide: 200, minAspect: null, note: 'a clear photo of the earrings on a plain background' },
   lipstick: { minShortSide: 100, minLongSide: 100, minAspect: null, note: 'a photo of the lipstick or a swatch of the shade' },
+  blush: { minShortSide: 100, minLongSide: 100, minAspect: null, note: 'a clear photo of the blush or its shade' },
+  foundation: { minShortSide: 100, minLongSide: 100, minAspect: null, note: 'a clear photo of the foundation or its shade' },
+  eyewear: { minShortSide: 200, minLongSide: 200, minAspect: null, note: 'a clear photo of the eyewear or sunglasses on a plain background' },
+  watch: { minShortSide: 200, minLongSide: 200, minAspect: null, note: 'a clear photo of the watch on a plain background' },
 };
 
 export const COLOUR_RULES = {
@@ -73,6 +98,8 @@ export const occasionIds = OCCASIONS.map((o) => o.id);
 
 export const publicCatalogConfig = () => ({
   itemTypes: ITEM_TYPES,
+  genders: GENDERS,
+  outfitCategories: OUTFIT_CATEGORIES,
   garmentCategories: GARMENT_CATEGORIES,
   metalTones: METAL_TONES,
   styles: STYLES,

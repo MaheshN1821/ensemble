@@ -117,6 +117,13 @@ test('image checks: size, shape, background and format', () => {
   assert.ok(checkImage(noisyPng(500, 700), 'outfit').warnings.some((w) => /background/.test(w.message)));
 });
 
+test('image checks: makeup types use their configured image rules', () => {
+  for (const type of ['lipstick', 'blush', 'foundation']) {
+    const result = checkImage(garmentPng(100, 100), type);
+    assert.deepEqual(result.errors, [], type);
+  }
+});
+
 // ---- SSRF guard ----
 test('safe fetch: blocks private addresses, non-https, and downloads from allowed hosts', async () => {
   for (const ip of ['127.0.0.1', '10.1.2.3', '192.168.0.9', '172.20.0.1', '169.254.169.254', '100.64.0.1', '::1', 'fd00::1', '::ffff:10.0.0.1']) assert.equal(isPrivateAddress(ip), true, ip);

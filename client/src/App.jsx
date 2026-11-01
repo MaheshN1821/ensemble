@@ -4,6 +4,7 @@ import Landing from './pages/Landing.jsx';
 import Start from './pages/Start.jsx';
 import Profile from './pages/Profile.jsx';
 import Looks from './pages/Looks.jsx';
+import Build from './pages/Build.jsx';
 import Look from './pages/Look.jsx';
 import MyLooks from './pages/MyLooks.jsx';
 import Compare from './pages/Compare.jsx';
@@ -12,6 +13,7 @@ import Store from './pages/Store.jsx';
 import Catalog from './pages/Catalog.jsx';
 import Retailer from './pages/Retailer.jsx';
 import Account from './pages/Account.jsx';
+import Makeup from './pages/Makeup.jsx';
 import System from './pages/System.jsx';
 import NotFound from './pages/NotFound.jsx';
 
@@ -24,7 +26,9 @@ export default function App() {
         <Route path="profile" element={<Profile />} />
         <Route path="looks" element={<Looks />} />
         <Route path="looks/:lookId" element={<Look />} />
+        <Route path="build" element={<Build />} />
         <Route path="my-looks" element={<MyLooks />} />
+        {/* <Route path="makeup" element={<Makeup />} /> */}
         <Route path="compare" element={<Compare />} />
         <Route path="s/:token" element={<Shared />} />
         <Route path="shop/:code" element={<Store />} />

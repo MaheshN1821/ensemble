@@ -17,8 +17,8 @@ export const round = (x, d = 2) => Math.round(x * 10 ** d) / 10 ** d;
 export const familyLabel = (id) => COLOUR_FAMILIES[id]?.label ?? id;
 const lower = (s) => s.toLowerCase();
 const METAL_NAME = { ...METAL_LABELS, oxidised: 'Oxidised silver' };
-export const SLOTS = ['outfit', 'necklace', 'earrings', 'lipstick'];
-export const JEWELLERY = ['necklace', 'earrings'];
+export const SLOTS = ['outfit', 'earrings', 'eyewear', 'lipstick', 'blush', 'foundation', 'watch'];
+export const JEWELLERY = ['earrings', 'eyewear', 'watch'];
 
 // ---- Context: everything about the shopper the scores need, resolved once ----
 
@@ -52,7 +52,7 @@ export function buildContext({ profile, prefs, constraints = {} }) {
   const palette = buildPalette(profile, prefs ?? {});
   const occasion = resolveOccasion(prefs);
   const shift = clamp(constraints.formalityShift ?? 0, -2, 2);
-  const formality = occasion.formality.map((f) => clamp(f + shift, 1, 5));
+  const formality = (occasion.formality ?? DEFAULT_OCCASION.formality).map((f) => clamp(f + shift, 1, 5));
   const metalPref = constraints.forceMetal ?? (prefs?.metal && prefs.metal !== 'any' ? prefs.metal : null);
   const silhouettes = prefs?.silhouettes ?? [];
   const budget = constraints.budgetInr ?? prefs?.budgetInr;
@@ -153,7 +153,7 @@ function scoreOccasion(items, ctx) {
   const jf = jewels.length ? jewels.reduce((sum, j) => sum + formalityScore(j.formality, occ.formality).value, 0) / jewels.length : S.noJewelleryFormality;
   const countOk = occ.jewellery === 0 ? 1 : Math.min(jewels.length / occ.jewellery, 1);
   if (jewels.length && jf >= 0.9) rules.push(rule('occasion', 'positive', 'jewellery-fits', 'The jewellery matches the formality of the outfit and the occasion.', jewels.map((j) => j.id)));
-  if (occ.jewellery > 0 && jewels.length < occ.jewellery) rules.push(rule('occasion', 'caution', 'jewellery-light', `${label[0].toUpperCase()}${label.slice(1)} usually calls for ${occ.jewellery === 2 ? 'a necklace and earrings' : 'some jewellery'}, and this look has ${jewels.length ? 'less' : 'none'}.`, jewels.map((j) => j.id)));
+  if (occ.jewellery > 0 && jewels.length < occ.jewellery) rules.push(rule('occasion', 'caution', 'jewellery-light', `${label[0].toUpperCase()}${label.slice(1)} usually calls for jewellery or accessories, and this look has ${jewels.length ? 'less' : 'none'}.`, jewels.map((j) => j.id)));
 
   const p = S.occasionParts;
   return { value: clamp(p.outfitFormality * of.value + p.outfitTag * tag + p.jewelleryFormality * jf + p.jewelleryCount * countOk, 0, 1), rules };
@@ -222,7 +222,7 @@ function scoreMetal(items, ctx) {
   const name = (m) => METAL_NAME[m] ?? m;
   const m0 = jewels[0].metalTone;
   const mixed = jewels.some((j) => j.metalTone !== m0);
-  if (mixed) { value *= S.metalMixedFactor; rules.push(rule('metal', 'caution', 'metal-mixed', 'The necklace and earrings are different metals, which can look less matched.', ids)); }
+  if (mixed) { value *= S.metalMixedFactor; rules.push(rule('metal', 'caution', 'metal-mixed', 'The accessories are different metals, which can look less matched.', ids)); }
   else if (ctx.metalPref) {
     if (m0 === ctx.metalPref) rules.push(rule('metal', 'positive', 'metal-pref', `${name(m0)} jewellery matches the metal you asked for.`, ids));
   } else if (m0 === ctx.metals.primary) rules.push(rule('metal', 'positive', 'metal-primary', `${name(m0)} is our first pick for your ${ctx.undertoneLabel} undertone.`, ids));
@@ -280,7 +280,7 @@ function scorePreferences(items, ctx) {
 const SCORERS = { colour: scoreColour, occasion: scoreOccasion, palette: scorePalette, metal: scoreMetal, preferences: scorePreferences };
 
 /**
- * Scores one look. `items` is { outfit, necklace?, earrings?, lipstick? } (catalog items as presented by the catalog service).
+ * Scores one look. `items` is { outfit, earrings?, lipstick?, eyewear?, watch? } (catalog items as presented by the catalog service).
  * Returns { total (0-100, integer), components: { key: { label?, weight, value (0-1), points } }, rules[] }.
  */
 export function scoreLook(items, ctx) {

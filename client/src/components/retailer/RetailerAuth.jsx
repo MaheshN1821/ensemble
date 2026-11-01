@@ -19,7 +19,7 @@ export default function RetailerAuth({ onDone }) {
         ))}
       </ul>
       <div className="rounded-2xl border border-line bg-paper p-5 sm:p-6">
-        <h2 className="mb-5 text-[20px] font-medium tracking-[-0.02em]">Retailer account</h2>
+        <h2 className="mb-5 text-[20px] font-medium tracking-[-0.02em] text-center">Retailer account</h2>
         <AuthForm role="retailer" onDone={onDone} />
       </div>
     </div>

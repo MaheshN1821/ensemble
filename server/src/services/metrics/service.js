@@ -1,6 +1,6 @@
 import { MAIN_STATS_ID, REFINEMENT_LABELS, STATS_NOTE, TOP_ITEMS_SHOWN, decodeKey, encodeKey } from '../../config/metrics.js';
 
-const SLOTS = ['outfit', 'necklace', 'earrings', 'lipstick'];
+const SLOTS = ['outfit', 'necklace', 'earrings', 'eyewear', 'lipstick', 'blush', 'foundation', 'watch'];
 
 /** Everyone plans from the one shared catalog, so every counter lives under it (a session's old private-catalog id is ignored). */
 export const catalogIdOf = () => MAIN_STATS_ID;

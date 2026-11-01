@@ -10,7 +10,7 @@ import { createSkinService } from '../src/services/skin/service.js';
 import { createRenderService } from '../src/services/render/service.js';
 import { createShareTokens } from '../src/services/render/share.js';
 import { photoKey, stageKey } from '../src/services/render/keys.js';
-import { buildRequest, lipTexture } from '../src/services/render/payloads.js';
+import { buildRequest, foundationEffect, lipTexture } from '../src/services/render/payloads.js';
 import { DEFAULT_FEATURES } from '../src/config/render.js';
 import { silentLogger, fakeJpeg, fakePng, createMemorySessions, createMemoryStorage } from './helpers.js';
 
@@ -87,6 +87,16 @@ test('payloads: outfit, jewellery in each style, lipstick', () => {
   assert.equal(files.feature, '2d-vto/earring');
   assert.equal(files.files[1].field, 'ref_file_ids');
   assert.equal(files.files[1].asArray, true);
+  const eyewearFeatures = { ...DEFAULT_FEATURES, eyewear: '2d-vto/glasses' };
+  assert.equal(buildRequest({ stage: 'eyewear', item: {}, features: eyewearFeatures, input, product }).feature, '2d-vto/glasses');
+  const watch = buildRequest({ stage: 'watch', item: {}, features: DEFAULT_FEATURES, input, product });
+  assert.equal(watch.feature, '2d-vto/watch');
+  assert.deepEqual(watch.params.object_infos[0].parameter, {
+    watch_need_remove_background: true,
+    watch_wearing_location: 0,
+    watch_shadow_intensity: 0.3,
+    watch_ambient_light_intensity: 1,
+  });
   const info = buildRequest({ stage: 'necklace', item: {}, features: DEFAULT_FEATURES, vtoStyle: 'info', input, product });
   assert.deepEqual(info.files.map((f) => f.field), ['source_info.name', 'object_infos.0.name']);
   const both = buildRequest({ stage: 'necklace', item: {}, features: DEFAULT_FEATURES, vtoStyle: 'both', input, product });
@@ -100,6 +110,15 @@ test('payloads: outfit, jewellery in each style, lipstick', () => {
   assert.equal(lip.params.effects[0].palettes[0].texture, 'gloss');
   assert.equal(lipTexture('Classic red').texture, 'matte');
   assert.throws(() => buildRequest({ stage: 'lipstick', item: { name: 'No colour', colours: [] }, features: DEFAULT_FEATURES, input }), /no lipstick colour/);
+
+  const foundation = buildRequest({
+    stage: 'foundation',
+    item: { colours: ['#D59B6A'] },
+    features: DEFAULT_FEATURES,
+    input,
+  });
+  assert.equal(foundation.feature, 'makeup-vto');
+  assert.deepEqual(foundation.params, { version: '1.0', effects: [foundationEffect({ colours: ['#D59B6A'] })] });
 });
 
 test('a look is drawn in four tasks, then repeating it costs nothing', async () => {

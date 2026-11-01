@@ -22,8 +22,8 @@ export function itemFingerprint(item) {
 
 /**
  * Cache key for one stage: the YouCam feature, the item (id + fingerprint) and the key of the image it draws on.
- * Because the input key is part of the key, changing only the lipstick re-runs only the lipstick: the earrings and
- * necklace results it draws on keep their keys.
+ * Because the input key is part of the key, changing only the lipstick re-runs only the lipstick: the earlier
+ * results it draws on keep their keys.
  */
 export function stageKey({ feature, stage, item, inputKey }) {
   return sha([RENDER_KEY_VERSION, feature, stage, item.id, itemFingerprint(item), inputKey].join('|')).slice(0, 24);

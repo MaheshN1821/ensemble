@@ -42,8 +42,15 @@ export function presentLook({ record, cacheByKey, live = null, active = false, s
   });
 
   const image = (entry, alt) => (entry ? { url: signedUrl(entry.publicId), width: entry.width ?? null, height: entry.height ?? null, alt } : null);
-  const outfitSaved = record.stages?.outfit;
-  const bodyEntry = outfitSaved?.status === 'done' ? cacheByKey.get(outfitSaved.key) : null;
+  const BODY_CHAIN_ORDER = ['watch', 'outfit'];
+  let bodyEntry = null;
+  for (const sid of BODY_CHAIN_ORDER) {
+    const s = record.stages?.[sid];
+    if (s?.status === 'done' && cacheByKey.has(s.key)) {
+      bodyEntry = cacheByKey.get(s.key);
+      break;
+    }
+  }
   const chain = (record.faceChain ?? []).filter((c) => cacheByKey.has(c.key));
   const faceEntry = chain.length ? cacheByKey.get(chain.at(-1).key) : null;
   const appliedNames = chain.map((c) => snap.items[c.slot]?.name).filter(Boolean);

@@ -95,7 +95,10 @@ export default function AuthForm({ role, initialMode = 'login', onDone }) {
       )}
 
       <ErrorNote error={error && !fieldError ? error : null} />
-      <Button type="submit" disabled={busy} className="w-full sm:w-auto">{busy ? 'One moment…' : register ? 'Create account' : 'Sign in'}</Button>
+      <div className='flex items-center justify-end'>
+        <Button type="submit" disabled={busy} className="w-full sm:w-auto">{busy ? 'One moment…' : register ? 'Create account' : 'Sign in'}</Button>
+      </div>
+      
     </form>
   );
 }

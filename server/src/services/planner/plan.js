@@ -15,7 +15,13 @@ const priceOf = (items) => Object.values(items).reduce((s, i) => s + (i?.price ?
 function pools(items, ctx) {
   const usable = items.filter((i) => !ctx.excludeItemIds.has(i.id)).sort(byId);
   const by = (t) => usable.filter((i) => i.type === t);
-  return { outfit: by('outfit'), necklace: by('necklace'), earrings: by('earrings'), lipstick: by('lipstick') };
+  return {
+    outfit: by('outfit'),
+    earrings: by('earrings'),
+    lipstick: by('lipstick'),
+    blush: by('blush'),
+    foundation: by('foundation'),
+  };
 }
 
 /** Which outfits may be considered at a relaxation level. Colours to avoid are never relaxed. */
@@ -61,9 +67,10 @@ const colourAvoided = (item, ctx) => (item.colours ?? []).some((c) => c.share >=
 
 function candidateSets(p, ctx) {
   return {
-    necklace: [null, ...slotCandidates('necklace', p.necklace, ctx)],
-    earrings: [null, ...slotCandidates('earrings', p.earrings, ctx)],
-    lipstick: p.lipstick.length ? slotCandidates('lipstick', p.lipstick, ctx) : [null],
+    earrings: [null, ...slotCandidates('earrings', p.earrings ?? [], ctx)],
+    lipstick: (p.lipstick ?? []).length ? slotCandidates('lipstick', p.lipstick, ctx) : [null],
+    blush: (p.blush ?? []).length ? slotCandidates('blush', p.blush, ctx) : [null],
+    foundation: (p.foundation ?? []).length ? slotCandidates('foundation', p.foundation, ctx) : [null],
   };
 }
 
@@ -73,15 +80,22 @@ function bestForOutfit(outfit, sets, ctx, budget) {
   for (const l of sets.lipstick) {
     const base = outfit.price + (l?.price ?? 0);
     if (base > budget) continue;
-    for (const n of sets.necklace) {
-      const withN = base + (n?.price ?? 0);
-      if (withN > budget) continue;
-      for (const e of sets.earrings) {
-        const total = withN + (e?.price ?? 0);
-        if (total > budget) continue;
-        const items = { outfit, necklace: n, earrings: e, lipstick: l };
-        const s = scoreLook(items, ctx);
-        if (!best || s.exact > best.s.exact + 1e-9 || (Math.abs(s.exact - best.s.exact) <= 1e-9 && total < best.total)) best = { items, s, total };
+    for (const e of sets.earrings) {
+      const withE = base + (e?.price ?? 0);
+      if (withE > budget) continue;
+      for (const b of sets.blush) {
+        const withBlush = withE + (b?.price ?? 0);
+        if (withBlush > budget) continue;
+        for (const f of sets.foundation) {
+          const total = withBlush + (f?.price ?? 0);
+          if (total > budget) continue;
+          const items = { outfit, earrings: e, lipstick: l, blush: b, foundation: f };
+          const s = scoreLook(items, ctx);
+          const itemCount = Object.values(items).filter(Boolean).length;
+          if (!best || itemCount > best.itemCount || (itemCount === best.itemCount && (s.exact > best.s.exact + 1e-9 || (Math.abs(s.exact - best.s.exact) <= 1e-9 && total < best.total)))) {
+            best = { items, s, total, itemCount };
+          }
+        }
       }
     }
   }
@@ -161,8 +175,9 @@ export function planLooks({ items, profile, prefs, constraints = {} }) {
   if (!p.outfit.length) {
     return finishPlan({ status: 'no_items', looks: [], closest: null, relaxed: [], minBudgetInr: null, message: 'This catalog has no outfits to plan from. Ask a retailer to add outfits.' });
   }
-  if (JEWELLERY.some((s) => ctx.metalPref && p[s].length && !sets[s].some(Boolean))) {
-    const slots = JEWELLERY.filter((s) => p[s].length && !sets[s].some(Boolean)).map((s) => s);
+  const plannedJewellery = ['earrings'];
+  if (plannedJewellery.some((s) => ctx.metalPref && p[s].length && !sets[s].some(Boolean))) {
+    const slots = plannedJewellery.filter((s) => p[s].length && !sets[s].some(Boolean)).map((s) => s);
     notes.push(`There are no ${ctx.metalPref.replace('-', ' ')} ${slots.join(' or ')} in this catalog, so these looks leave ${slots.length > 1 ? 'them' : 'it'} out.`);
   }
 
@@ -183,9 +198,25 @@ export function planLooks({ items, profile, prefs, constraints = {} }) {
 
   if (feasible.length) {
     const picked = pickDiverse(feasible, ctx, SEARCH.looks);
+    if (picked.length < SEARCH.looks) {
+      const eligible = eligibleOutfits(p.outfit, ctx, LEVELS[chosenLevel]);
+      const affordableIds = new Set(picked.map((f) => f.items.outfit.id));
+      const overBudget = eligible
+        .filter((o) => !affordableIds.has(o.id))
+        .map((o) => bestForOutfit(o, sets, ctx, Number.POSITIVE_INFINITY))
+        .filter(Boolean)
+        .sort((a, b) => b.itemCount - a.itemCount || b.s.exact - a.s.exact || a.total - b.total || byId(a.items.outfit, b.items.outfit));
+      for (const candidate of overBudget) {
+        if (picked.length >= SEARCH.looks) break;
+        picked.push(candidate);
+      }
+      if (picked.some((f) => f.total > budget)) {
+        notes.push(`Some complete looks exceed your ${money(budget)} budget. You can still choose one, or build your own look to control the pieces and price.`);
+      }
+    }
     // Diversity decides WHICH looks are shown. They are listed with explicit asks first, then best score first.
     picked.sort((a, b) => askMatches(b.items.outfit, ctx) - askMatches(a.items.outfit, ctx) || b.s.exact - a.s.exact || a.total - b.total || byId(a.items.outfit, b.items.outfit));
-    const looks = picked.map((f, i) => finish(f, ctx, i + 1));
+    const looks = picked.map((f, i) => finish(f, ctx, i + 1, { withinBudget: f.total <= budget }));
     if (looks.length < SEARCH.looks) notes.push(`Only ${looks.length === 1 ? 'one look fits' : `${looks.length} looks fit`} your budget and choices. A higher budget shows more.`);
     const cheapest = Math.min(...feasible.map((f) => f.total));
     return finishPlan({ status: 'ok', looks, closest: null, relaxed: reported, minBudgetInr: cheapest, message: null });
@@ -201,7 +232,7 @@ export function planLooks({ items, profile, prefs, constraints = {} }) {
   const cheapest = (list) => [...list].sort((a, b) => a.price - b.price || byId(a, b))[0] ?? null;
   const outfit = [...outfits].sort((a, b) => a.price - b.price || byId(a, b))[0];
   const lipstick = cheapest(sets.lipstick.filter(Boolean));
-  const closestItems = { outfit, necklace: null, earrings: null, lipstick };
+  const closestItems = { outfit, earrings: null, lipstick, eyewear: null, watch: null };
   const total = priceOf(closestItems);
   const found = { items: closestItems, s: scoreLook(closestItems, ctx), total };
   const closest = finish(found, ctx, 1, { withinBudget: false });
@@ -228,7 +259,7 @@ export function swapItem({ look, slot, items, profile, prefs, constraints = {}, 
   const exclude = new Set([...ctx.excludeItemIds, current?.id].filter(Boolean));
   const p = pools(items.filter((i) => !exclude.has(i.id)), { ...ctx, excludeItemIds: new Set() });
   let candidates = p[slot];
-  if (!candidates) return { ok: false, reason: 'BAD_SLOT', message: 'You can swap the outfit, necklace, earrings or lipstick.' };
+  if (!candidates) return { ok: false, reason: 'BAD_SLOT', message: 'You can swap the outfit, earrings, lipstick, eyewear or watch.' };
   if (slot === 'outfit') candidates = eligibleOutfits(candidates, ctx, LEVELS.at(-1));
   if (JEWELLERY.includes(slot)) candidates = candidates.filter((j) => !(ctx.metalPref && j.metalTone !== ctx.metalPref) && !colourAvoided(j, ctx));
   // `filter` lets a caller ask for a direction (cheaper, warmer, less formal) while the planner still scores and picks.

@@ -20,7 +20,7 @@ function Shell({ children }) {
 
 function Card({ look, selected, onToggle, onRemove, removing }) {
   const [confirming, setConfirming] = useState(false);
-  const names = ['outfit', 'necklace', 'earrings', 'lipstick'].map((s) => look.items[s]).filter(Boolean);
+  const names = ['outfit', 'earrings', 'lipstick', 'eyewear', 'watch'].map((s) => look.items[s]).filter(Boolean);
   const id = `look-${look.id}`;
   return (
     <li className={`flex flex-col rounded-2xl border bg-paper p-4 ${selected ? 'border-rani' : 'border-line'}`}>

@@ -4,7 +4,7 @@
  * A look is drawn in stages (FR-18). The body panel is one stage; the face panel is a chain, because each jewellery
  * or makeup task draws on the previous result:
  *
- *   body panel:  outfit                      -> cloth try-on on the full-length photo
+ *   body panel:  outfit -> watch             -> cloth/accessory try-on on the full-length photo
  *   face panel:  earrings -> necklace -> lipstick   (each one draws on the previous result, starting from the selfie)
  *
  * Feature ids come from the environment (config.render.features) so a wrong guess is fixed without a code change.
@@ -17,7 +17,11 @@ export const STAGES = [
   { id: 'outfit', panel: 'body', slot: 'outfit', label: 'Outfit', doing: 'Putting the outfit on your photo' },
   { id: 'earrings', panel: 'face', slot: 'earrings', label: 'Earrings', doing: 'Adding the earrings' },
   { id: 'necklace', panel: 'face', slot: 'necklace', label: 'Necklace', doing: 'Adding the necklace' },
+  { id: 'eyewear', panel: 'face', slot: 'eyewear', label: 'Eyewear', doing: 'Fitting the eyewear' },
   { id: 'lipstick', panel: 'face', slot: 'lipstick', label: 'Lipstick', doing: 'Applying the lipstick' },
+  { id: 'blush', panel: 'face', slot: 'blush', label: 'Blush', doing: 'Applying the blush' },
+  { id: 'foundation', panel: 'face', slot: 'foundation', label: 'Foundation', doing: 'Applying the foundation' },
+  { id: 'watch', panel: 'body', slot: 'watch', label: 'Watch', doing: 'Fitting the watch' },
 ];
 export const STAGE_BY_ID = Object.fromEntries(STAGES.map((s) => [s.id, s]));
 export const FACE_ORDER = STAGES.filter((s) => s.panel === 'face').map((s) => s.id);
@@ -26,12 +30,16 @@ export const DEFAULT_FEATURES = {
   outfit: 'cloth-v4',
   earrings: '2d-vto/earring',
   necklace: '2d-vto/necklace',
+  eyewear: null,
   lipstick: 'makeup-vto',
+  blush: 'makeup-vto',
+  foundation: 'makeup-vto',
+  watch: null,
 };
 
 // Unit prices from the YouCam docs, used ONLY when neither YOUCAM_UNIT_OVERRIDES nor the live feature-cost
-// endpoint gives a price. They are flagged "estimated" in the ledger. Earrings cost 2 units for stacked wear.
-export const DOCUMENTED_UNITS = { outfit: 2, earrings: 1, necklace: 1, lipstick: 1 };
+// endpoint gives a price. They are flagged "estimated" in the ledger.
+export const DOCUMENTED_UNITS = { outfit: 2, earrings: 1, necklace: 1, eyewear: 1, lipstick: 1, blush: 1, foundation: 1, watch: 1 };
 
 export const LIMITS = {
   maxLooksPerSession: 6, // FR-25
@@ -91,6 +99,23 @@ export function friendlyStageError(stage, err) {
   const mapped = ENGINE_ERRORS[code.toLowerCase()];
   const what = STAGE_BY_ID[stage]?.label?.toLowerCase() ?? 'this step';
   if (mapped) return { code: code || 'TASK_FAILED', message: mapped, retryable: !['error_nsfw_content_detected', 'error_invalid_ref', 'invalid_parameter'].includes(code.toLowerCase()) };
+  if (stage === 'watch' && code === '4') {
+    return {
+      code: 'INVALID_WATCH_PARAMETERS',
+      message: 'YouCam could not place the watch. Use a clear full-length photo with one unobstructed wrist and a watch product photo showing the whole watch.',
+      retryable: false,
+    };
+  }
+  if (['lipstick', 'blush', 'foundation'].includes(stage) && ['invalidparameters', 'invalid_parameter'].includes(code.toLowerCase())) {
+    return {
+      code: 'INVALID_MAKEUP_PARAMETERS',
+      message: `YouCam rejected the ${what} settings. Check that the selected shade is a valid hex colour and retry.`,
+      retryable: false,
+    };
+  }
+  if (err?.name === 'YoucamError' && err.status === 404 && ['eyewear', 'watch'].includes(stage)) {
+    return { code: 'FEATURE_UNAVAILABLE', message: `Virtual try-on is not available for ${what} in the current YouCam account.`, retryable: false };
+  }
   switch (err?.code) {
     case 'SESSION_CAP': return { code: 'SESSION_CAP', message: 'You have used this session\'s unit allowance, so no more looks can be drawn. Looks already drawn stay available.', retryable: false };
     case 'GLOBAL_CAP': return { code: 'GLOBAL_CAP', message: 'The daily unit allowance for this demo has been reached. Looks already drawn stay available. Try again tomorrow.', retryable: false };

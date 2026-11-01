@@ -92,10 +92,18 @@ function Ready({ plan, constraints, replan, busy, see }) {
 
       <BudgetTry plan={plan} constraints={constraints} replan={replan} busy={busy} />
 
+      <div className="mt-10 flex flex-col gap-4 rounded-2xl border border-line bg-paper p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <div className="max-w-[56ch]">
+          <h2 className="text-[20px] font-medium tracking-[-0.02em]">Prefer to choose the pieces yourself?</h2>
+          <p className="mt-1 text-[15px] leading-relaxed text-ink-soft">Pick your own outfit, jewellery and lipstick from the catalog, then see the whole look on you.</p>
+        </div>
+        <Button to="/build" variant="secondary" className="shrink-0">Build your own look</Button>
+      </div>
+
       <details className="mt-10 border-t border-line py-6">
         <summary className="cursor-pointer text-[15px] text-ink-soft hover:text-ink">How we choose looks</summary>
         <div className="mt-4 max-w-[64ch] space-y-3 text-[15px] leading-relaxed text-ink-soft">
-          <p>Your budget is a hard limit. Within it, we search the catalog and score each combination with fixed styling rules. No language model picks items, prices or scores.</p>
+          <p>We first try to include an outfit, earrings, lipstick, blush and foundation within your budget. If there is room for fewer complete looks, we may show one clearly marked over-budget option. No language model picks items, prices or scores.</p>
           <ul className="space-y-1.5">
             {plan.weights.map((w) => <li key={w.key}><span className="font-medium text-ink">{w.label} ({w.weight} points).</span> {w.blurb}</li>)}
           </ul>

@@ -50,7 +50,7 @@ export function AuthProvider({ children }) {
   /** Drops the sign-in on this browser. Everything stays saved on the server for the next sign-in. */
   const signOut = useCallback(async (role) => {
     const token = readToken(role);
-    if (token) await api('/api/auth/logout', { method: 'POST', authToken: token }).catch(() => {});
+    if (token) await api('/api/auth/logout', { method: 'POST', authToken: token }).catch(() => { });
     clearToken(role);
     set(role, empty());
     if (role === 'shopper') clearStoredSession(); // the next visit starts a fresh anonymous session

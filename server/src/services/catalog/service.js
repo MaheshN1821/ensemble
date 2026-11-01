@@ -6,7 +6,9 @@ import { SEED_ROWS, SEED_VERSION } from '../../data/seed.js';
 const newId = () => randomBytes(9).toString('base64url');
 const LEGACY_SAMPLE_ID = 'sample'; // the old built-in 30-item sample catalog, removed at boot
 const MAX_STORED_PROBLEMS = 100;
-const countByType = (list) => list.reduce((acc, i) => ({ ...acc, [i.type]: (acc[i.type] ?? 0) + 1 }), { outfit: 0, necklace: 0, earrings: 0, lipstick: 0 });
+const countByType = (list) => list.reduce((acc, i) => ({ ...acc, [i.type]: (acc[i.type] ?? 0) + 1 }), {
+  outfit: 0, necklace: 0, earrings: 0, lipstick: 0, blush: 0, foundation: 0, eyewear: 0, watch: 0,
+});
 const cleanFileName = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
 
 /**
@@ -25,6 +27,8 @@ export function createCatalogService({ repo, importer, storage, metrics, session
     catalogId: item.catalogId,
     sku: item.sku ?? item.itemId,
     type: item.type,
+    gender: item.gender ?? 'unisex',
+    category: item.category ?? null,
     name: item.name,
     price: item.price,
     imageUrl: item.imageUrl?.startsWith('/') && publicBase ? `${publicBase}${item.imageUrl}` : item.imageUrl,

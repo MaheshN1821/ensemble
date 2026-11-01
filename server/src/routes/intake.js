@@ -77,7 +77,8 @@ export function intakeRoutes({ config, sessions, storage, logger, renders, agent
 
   const presentAsset = (kind, a) => {
     if (!a) return null;
-    const url = a.source === 'sample' ? `/samples/${a.sampleId}/${kind}.jpg` : a.publicId && storage.isConfigured() ? storage.signedUrl(a.publicId) : null;
+    const fileName = kind === 'selfie' ? 'selfi.png' : 'body.png';
+    const url = a.source === 'sample' ? `/samples/${a.sampleId}/${fileName}` : a.publicId && storage.isConfigured() ? storage.signedUrl(a.publicId) : null;
     return { source: a.source, sampleId: a.sampleId ?? undefined, width: a.width, height: a.height, url };
   };
 

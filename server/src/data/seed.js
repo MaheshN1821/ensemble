@@ -1,5 +1,5 @@
 /**
- * The catalog Ensemble starts with: data/seedCatalog.json (13 items: 10 outfits, a necklace, earrings and a lipstick),
+ * The catalog Ensemble starts with: data/seedCatalog.json (11 items: 10 outfits, a necklace, earrings and a lipstick),
  * each with its photo already hosted on Cloudinary. To change the starting catalog, edit that JSON file and redeploy:
  * the server fingerprints the file and re-applies it at boot when the fingerprint changes. Items a retailer uploaded are
  * never touched by this.

@@ -1,4 +1,4 @@
-export const SLOTS = ['outfit', 'necklace', 'earrings', 'lipstick'];
+export const SLOTS = ['outfit', 'earrings', 'lipstick', 'eyewear', 'watch'];
 export const MAX_COMPARE = 2;
 
 /**

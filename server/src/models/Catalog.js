@@ -27,7 +27,9 @@ const itemSchema = new mongoose.Schema(
     retailerId: { type: String, default: null, index: true }, // the owning account. null for the built-in items
     retailerName: { type: String, default: null }, // shown to shoppers as "Sold by"
     uploadId: { type: String, default: null, index: true }, // the latest upload that wrote this item
-    type: { type: String, enum: ['outfit', 'necklace', 'earrings', 'lipstick'], required: true },
+    type: { type: String, enum: ['outfit', 'earrings', 'lipstick', 'blush', 'foundation', 'eyewear', 'watch'], required: true },
+    gender: { type: String, enum: ['women', 'men', 'unisex'], default: 'unisex' },
+    category: { type: String, default: null }, // e.g., saree, party, casual, formal, festive
     name: { type: String, required: true },
     price: { type: Number, required: true },
     imageUrl: { type: String, required: true },

@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { compareLooks, pairFromParams, toggleSelection } from '../src/lib/compare.js';
 
 const item = (id, price = 100) => ({ id, name: id, price });
-const A = { items: { outfit: item('o1'), necklace: item('n1'), lipstick: item('l1') }, totalPrice: 5000, score: 80, reasons: ['r1', 'shared'] };
-const B = { items: { outfit: item('o2'), necklace: item('n1'), earrings: item('e1'), lipstick: item('l1') }, totalPrice: 6500, score: 74, reasons: ['shared', 'r2'] };
+const A = { items: { outfit: item('o1'), earrings: item('e1'), lipstick: item('l1') }, totalPrice: 5000, score: 80, reasons: ['r1', 'shared'] };
+const B = { items: { outfit: item('o2'), earrings: item('e1'), eyewear: item('ew1'), lipstick: item('l1') }, totalPrice: 6500, score: 74, reasons: ['shared', 'r2'] };
 
 test('compare: rows say what is shared and what differs', () => {
   const c = compareLooks(A, B);
-  assert.deepEqual(c.rows.map((r) => [r.slot, r.same, r.onlyIn]), [['outfit', false, null], ['necklace', true, null], ['earrings', false, 'b'], ['lipstick', true, null]]);
+  assert.deepEqual(c.rows.map((r) => [r.slot, r.same, r.onlyIn]), [['outfit', false, null], ['earrings', true, null], ['lipstick', true, null], ['eyewear', false, 'b'], ['watch', true, null]]);
   assert.equal(c.differing, 2);
   assert.equal(c.priceDiff, 1500);
   assert.equal(c.scoreDiff, -6);

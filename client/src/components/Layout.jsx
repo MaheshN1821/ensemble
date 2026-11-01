@@ -15,7 +15,9 @@ const TITLES = [
   ['/profile', 'Your colours'],
   ['/looks', 'Your looks'],
   ['/looks/:lookId', 'Your look'],
+  ['/build', 'Build your own look'],
   ['/my-looks', 'My looks'],
+  // ['/makeup', 'Makeup Studio: custom consultation & try-on'],
   ['/compare', 'Compare two looks'],
   ['/s/:token', 'A shared look'],
   ['/catalog', 'Catalog'],
@@ -27,11 +29,12 @@ const titleFor = (pathname) => TITLES.find(([pattern]) => matchPath({ path: patt
 
 const NAV = [
   { to: '/my-looks', label: 'My looks' },
+  // { to: '/makeup', label: 'Makeup Studio' },
   { to: '/catalog', label: 'Catalog' },
   { to: '/retailer', label: 'For retailers' },
 ];
 
-function Header({ hasSession, onHood }) {
+function Header() {
   const { shopper } = useAuth();
   const [menu, setMenu] = useState(false);
   const { pathname } = useLocation();
@@ -45,7 +48,6 @@ function Header({ hasSession, onHood }) {
   }, [menu]);
 
   const link = ({ isActive }) => `inline-flex min-h-11 items-center text-[15px] transition-colors hover:text-rani ${isActive ? 'text-ink underline decoration-rani decoration-2 underline-offset-[10px]' : 'text-ink-soft'}`;
-  const hoodClass = 'inline-flex min-h-11 items-center gap-2 text-[15px] text-ink-soft transition-colors hover:text-rani';
   return (
     <header className="border-b border-line/80">
       <div className="mx-auto flex h-[72px] max-w-6xl items-center justify-between gap-4 px-5 sm:px-8">
@@ -56,7 +58,6 @@ function Header({ hasSession, onHood }) {
 
         <nav className="hidden items-center gap-7 md:flex" aria-label="Main">
           {NAV.map((n) => <NavLink key={n.to} to={n.to} className={link}>{n.label}</NavLink>)}
-          {hasSession && <button type="button" onClick={onHood} className={hoodClass}><span aria-hidden="true" className="font-mono text-[13px]">{'{ }'}</span>Under the hood</button>}
           <NavLink to="/account" className={link}>{shopper.token ? 'Account' : 'Sign in'}</NavLink>
           <Button to="/start" className="h-10 px-5 text-sm">Start</Button>
         </nav>
@@ -76,7 +77,6 @@ function Header({ hasSession, onHood }) {
             <li><NavLink to="/#how" className="flex min-h-12 items-center text-[17px]">How it works</NavLink></li>
             {NAV.map((n) => <li key={n.to}><NavLink to={n.to} className="flex min-h-12 items-center text-[17px]">{n.label}</NavLink></li>)}
             <li><NavLink to="/account" className="flex min-h-12 items-center text-[17px]">{shopper.token ? 'Account' : 'Sign in'}</NavLink></li>
-            {hasSession && <li><button type="button" onClick={() => { setMenu(false); onHood(); }} className="flex min-h-12 w-full items-center text-left text-[17px]">Under the hood</button></li>}
             <li><NavLink to="/system" className="flex min-h-12 items-center text-[17px]">System</NavLink></li>
           </ul>
         </nav>
@@ -109,7 +109,6 @@ export default function Layout() {
   const [announce, setAnnounce] = useState('');
   const [hood, setHood] = useState(false);
   const first = useRef(true);
-  // The header shows "Under the hood" only once a session exists, and re-checks on every page change.
   const hasSession = Boolean(readStoredSession());
   const title = titleFor(pathname);
 
@@ -132,7 +131,7 @@ export default function Layout() {
     <>
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-ink focus:px-4 focus:py-2 focus:text-white">Skip to content</a>
       <OfflineBanner />
-      <Header hasSession={hasSession} onHood={() => setHood(true)} />
+      <Header />
       <main id="main" tabIndex={-1} className="outline-none">
         <ErrorBoundary key={pathname}>
           <Outlet />

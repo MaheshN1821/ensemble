@@ -14,17 +14,19 @@ import RetailerUsage from './RetailerUsage.jsx';
 import { ErrorNote } from '../intake/fields.jsx';
 
 const API = import.meta.env.VITE_API_URL || '';
-const TYPES = ['all', 'outfit', 'necklace', 'earrings', 'lipstick'];
+const TYPES = ['all', 'outfit', 'earrings', 'lipstick', 'blush', 'foundation', 'eyewear', 'watch'];
 const when = (iso) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const COLUMNS = [
-  ['type', 'outfit, necklace, earrings or lipstick'],
+  ['type', 'outfit, earrings, lipstick, blush, foundation, eyewear or watch'],
+  ['gender', 'all, women, men or unisex'],
+  ['category', 'for outfits: casual, party, saree, formal or festive'],
   ['name, price', 'price in whole rupees'],
   ['image_url', 'a public https link to a .jpg or .png. A plain background works best'],
-  ['formality', '1 (casual) to 5 (very formal)'],
-  ['occasion_tags', 'for example wedding-guest|festive'],
-  ['metal_tone', 'necklaces and earrings: gold, silver, rose gold or oxidised'],
-  ['colours', 'optional. If blank we read them from the photo'],
+  ['formality', '1 (casual) to 5 (very formal). Optional for makeup'],
+  ['occasion_tags', 'for example wedding-guest|festive|office|party'],
+  ['metal_tone', 'earrings and watches: gold, silver, rose gold or oxidised'],
+  ['colours', 'hex codes (#DE6B7E, #D59B6A) or names. Crucial for makeup virtual try-on'],
 ];
 
 function Panel({ id, title, children, intro }) {
@@ -95,7 +97,15 @@ export default function RetailerDashboard() {
   const [usageTick, setUsageTick] = useState(0);
 
   const items = data?.items ?? [];
-  const shown = useMemo(() => items.filter((i) => (type === 'all' || i.type === type) && (uploadFilter === 'all' || i.uploadId === uploadFilter)), [items, type, uploadFilter]);
+  const [gender, setGender] = useState('all');
+  const [category, setCategory] = useState('all');
+  const shown = useMemo(() => items.filter((i) => {
+    if (type !== 'all' && i.type !== type) return false;
+    if (gender !== 'all' && i.gender && i.gender !== gender && i.gender !== 'unisex') return false;
+    if (type === 'outfit' && category !== 'all' && i.category !== category) return false;
+    if (uploadFilter !== 'all' && i.uploadId !== uploadFilter) return false;
+    return true;
+  }), [items, type, gender, category, uploadFilter]);
 
   if (phase === 'loading' && !data) return <div className="mt-10"><LoadingBlock label="Loading your catalog…" cards={3} /></div>;
   if (!data) {
@@ -144,9 +154,9 @@ export default function RetailerDashboard() {
       <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-5">
         <Stat label="Items live" value={summary.items} />
         <Stat label="Outfits" value={summary.counts.outfit} />
-        <Stat label="Necklaces" value={summary.counts.necklace} />
         <Stat label="Earrings" value={summary.counts.earrings} />
         <Stat label="Lipsticks" value={summary.counts.lipstick} />
+        <Stat label="Other" value={(summary.counts.eyewear ?? 0) + (summary.counts.watch ?? 0)} />
       </dl>
 
       <Panel id="add-title" title="Add items" intro={`Every valid item goes live for shoppers at once and stays here until you delete it. You can have up to ${summary.limit} items.`}>
@@ -158,6 +168,20 @@ export default function RetailerDashboard() {
           <summary className="cursor-pointer text-[15px] text-ink-soft hover:text-ink">What goes in each column</summary>
           <dl className="mt-4 space-y-2 text-[15px]">{COLUMNS.map(([k, v]) => <div key={k} className="grid gap-1 sm:grid-cols-[10rem_1fr]"><dt className="font-mono text-[13px]">{k}</dt><dd className="text-ink-soft">{v}</dd></div>)}</dl>
         </details>
+        {/* <div className="mb-5 rounded-xl border border-rani/20 bg-rani-wash/30 p-4 text-[14px]">
+          <h3 className="font-semibold text-rani-deep flex items-center gap-1.5">
+            <span>✨</span> Guidelines for Adding Makeup Products (Lipstick, Blush, Foundation)
+          </h3>
+          <p className="mt-1 text-ink-soft">
+            To ensure YouCam AI Virtual Try-On renders accurately on shopper photos:
+          </p>
+          <ul className="mt-2 list-disc list-inside space-y-1 text-ink-soft">
+            <li><strong className="text-ink">Type:</strong> Use <code className="bg-paper px-1 rounded">lipstick</code>, <code className="bg-paper px-1 rounded">blush</code>, or <code className="bg-paper px-1 rounded">foundation</code>.</li>
+            <li><strong className="text-ink">Colours (Crucial):</strong> Provide the shade as a hex code (e.g. <code className="bg-paper px-1 rounded">#DE6B7E</code> for blush, <code className="bg-paper px-1 rounded">#D59B6A</code> for foundation, <code className="bg-paper px-1 rounded">#A03F2E</code> for lipstick) or color name. The AI applies this exact pigment to the shopper's face.</li>
+            <li><strong className="text-ink">Product URL:</strong> Include your store or checkout link so shoppers can buy the product directly.</li>
+            <li><strong className="text-ink">Image URL:</strong> A direct HTTPS link to a clear product photo or swatch.</li>
+          </ul>
+        </div> */}
         <ImportForm token={token} hasItems={summary.items > 0} onReport={setReport} onDone={(out) => { apply(out); setUsageTick((n) => n + 1); }} />
       </Panel>
 
@@ -176,8 +200,10 @@ export default function RetailerDashboard() {
         <h2 id="items-title" className="text-[20px] font-medium tracking-[-0.02em]">Your items ({summary.items})</h2>
         <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label="Filter by item type">
           {TYPES.map((t) => (
-            <button key={t} type="button" aria-pressed={type === t} onClick={() => setType(t)} className={`inline-flex min-h-11 items-center rounded-full border px-4 text-[15px] transition-colors ${type === t ? 'border-rani bg-rani-wash text-rani-deep' : 'border-line bg-paper hover:border-ink'}`}>
-              {t === 'all' ? 'All' : `${TYPE_LABEL[t]}s`.replace('Earringss', 'Earrings')}
+            <button key={t} type="button" aria-pressed={type === t}
+              onClick={() => { setType(t); setCategory('all'); }}
+              className={`inline-flex min-h-11 items-center rounded-full border px-4 text-[15px] transition-colors ${type === t ? 'border-rani bg-rani-wash text-rani-deep' : 'border-line bg-paper hover:border-ink'}`}>
+              {t === 'all' ? 'All' : (TYPE_LABEL[t] ? `${TYPE_LABEL[t]}s`.replace('Eyewears', 'Eyewear').replace('Watchs', 'Watches').replace('Earringss', 'Earrings') : t)}
             </button>
           ))}
           {uploads.length > 1 && (
@@ -189,6 +215,24 @@ export default function RetailerDashboard() {
             </label>
           )}
         </div>
+        <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Filter by gender">
+          {['all', 'women', 'men', 'unisex'].map((g) => (
+            <button key={g} type="button" aria-pressed={gender === g} onClick={() => setGender(g)}
+              className={`inline-flex min-h-9 items-center rounded-full border px-3 text-[13px] transition-colors ${gender === g ? 'border-rani bg-rani-wash text-rani-deep' : 'border-line bg-paper text-ink-soft hover:border-ink hover:text-ink'}`}>
+              {g === 'all' ? 'All genders' : g.charAt(0).toUpperCase() + g.slice(1)}
+            </button>
+          ))}
+        </div>
+        {type === 'outfit' && (
+          <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Filter by outfit category">
+            {['all', 'casual', 'party', 'saree', 'formal', 'festive'].map((c) => (
+              <button key={c} type="button" aria-pressed={category === c} onClick={() => setCategory(c)}
+                className={`inline-flex min-h-9 items-center rounded-full border px-3 text-[13px] transition-colors ${category === c ? 'border-zari bg-zari-wash text-ink' : 'border-line bg-paper text-ink-soft hover:border-ink hover:text-ink'}`}>
+                {c === 'all' ? 'All categories' : c.charAt(0).toUpperCase() + c.slice(1)}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="mt-5"><ItemGrid items={shown} onRemove={removeItem} busy={busy} empty={summary.items === 0 ? 'You have no items yet. Upload a file above.' : 'No items match this filter.'} /></div>
       </section>
 

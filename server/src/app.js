@@ -15,7 +15,10 @@ import { accountRoutes } from './routes/account.js';
 import { createAuthService } from './services/auth/service.js';
 import { createMemoryAuthStore } from './services/auth/storeMemory.js';
 import { plannerRoutes } from './routes/planner.js';
+import { builderRoutes } from './routes/builder.js';
+import { createBuilderService } from './services/builder/service.js';
 import { renderRoutes } from './routes/render.js';
+import { makeupRoutes } from './routes/makeup.js';
 import { agentRoutes } from './routes/agent.js';
 import { createAgentService } from './services/agent/service.js';
 import { createLlm } from './services/agent/llm.js';
@@ -117,7 +120,10 @@ export function createApp(deps) {
   app.use(retailerRoutes({ ...deps, auth, catalogs, metrics, limiters }));
   app.use(accountRoutes({ ...deps, auth, skin }));
   app.use(plannerRoutes({ ...deps, planner }));
+  // Build your own look: the shopper picks the pieces, we score them. Free; drawing goes through the render routes below.
+  app.use(builderRoutes({ ...deps, builder: deps.builder ?? createBuilderService({ catalogs, skin }) }));
   app.use(renderRoutes({ ...deps, renders }));
+  app.use(makeupRoutes({ ...deps, skin, catalogs }));
   app.use(agentRoutes({ ...deps, agent }));
   if (config.enableDevRoutes) app.use(devRoutes(deps));
 

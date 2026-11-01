@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { AppError } from '../../lib/errors.js';
 import { readImageInfo } from '../../lib/imageInfo.js';
 import { BUDGET } from '../../config/intake.js';
@@ -13,7 +13,8 @@ import { createShareTokens } from './share.js';
 import { presentLook, presentShared, snapshotOf } from './view.js';
 
 const LOOK_ID = /^look_[a-f0-9]{10}$/;
-const SLOTS = ['outfit', 'necklace', 'earrings', 'lipstick'];
+const SLOTS = ['outfit', 'necklace', 'earrings', 'eyewear', 'lipstick', 'watch', 'blush', 'foundation'];
+const accessoryLookId = (items) => `look_${createHash('sha1').update(Object.entries(items).map(([slot, item]) => `${slot}:${item.id}`).sort().join('|')).digest('hex').slice(0, 10)}`;
 const CAP_CODES = new Set(['SESSION_CAP', 'GLOBAL_CAP']);
 
 class Aborted extends Error {
@@ -21,6 +22,7 @@ class Aborted extends Error {
 }
 
 const sessionGone = () => new AppError('SESSION_EXPIRED', 'Your session has ended. Start again to continue.', 401);
+const featureUnavailable = (slot) => new AppError('FEATURE_UNAVAILABLE', `Virtual try-on is not available for ${slot} in the current YouCam account.`, 503);
 const lookGone = () => new AppError('NOT_FOUND', 'That look is not in your session any more. Plan your looks again.', 404);
 const shareGone = () => new AppError('SHARE_EXPIRED', 'This link has expired, or the look was deleted.', 404);
 const jpegOrPng = (info) => (info.format === 'png' ? { contentType: 'image/png', ext: 'png' } : { contentType: 'image/jpg', ext: 'jpg' });
@@ -28,7 +30,7 @@ const jpegOrPng = (info) => (info.format === 'png' ? { contentType: 'image/png',
 /**
  * Draws looks on the shopper's own photos (Stage 6).
  *
- *  - The body panel is one task (outfit). The face panel is a chain (earrings, necklace, lipstick), each drawing on the
+ *  - The body panel is one task (outfit, watch). The face panel is a chain (earrings, eyewear, lipstick), each drawing on the
  *    previous result. The two panels run side by side.
  *  - Every result is copied to our storage at once and cached under (feature, item, input image). A repeat costs nothing,
  *    and changing only the lipstick re-runs only the lipstick.
@@ -43,6 +45,7 @@ export function createRenderService({
 }) {
   const rc = config.render ?? {};
   const features = { ...DEFAULT_FEATURES, ...(rc.features ?? {}) };
+  const stages = STAGES.filter((stage) => features[stage.slot]);
   const deleteTasks = rc.deleteTasks !== false;
   const renderCap = rc.sessionRenderCap ?? LIMITS.defaultSessionRenderCap;
   const publicBase = String(config.publicClientUrl ?? '').replace(/\/$/, '');
@@ -125,7 +128,10 @@ export function createRenderService({
     const photo = job.photos[kind];
     let buffer;
     try {
-      if (photo.source === 'sample') buffer = await getOwn(`${publicBase}/samples/${photo.sampleId}/${kind}.jpg`);
+      if (photo.source === 'sample') {
+        const fileName = kind === 'selfie' ? 'selfi.png' : 'body.png';
+        buffer = await getOwn(`${publicBase}/samples/${photo.sampleId}/${fileName}`);
+      }
       else buffer = await storage.readBuffer(photo.publicId, { maxSide });
     } catch (err) {
       log.error({ err: err.message, kind }, 'could not load photo for render');
@@ -227,7 +233,7 @@ export function createRenderService({
 
   // ---------- running one stage ----------
 
-  const isJewellery = (stage) => stage === 'earrings' || stage === 'necklace';
+  const isJewellery = (stage) => stage === 'earrings' || stage === 'necklace' || stage === 'eyewear' || stage === 'watch';
   const wasRejectedAsBadPayload = (err) =>
     (err?.name === 'YoucamError' && err.status === 400 && !/credit/i.test(String(err.code))) ||
     (err?.code === 'TASK_FAILED' && String(err.details?.code).toLowerCase() === 'invalid_parameter');
@@ -258,7 +264,8 @@ export function createRenderService({
     setLive(job, stage, 'running');
     const t0 = now();
     try {
-      const [input, product] = await Promise.all([loadInput(), stage === 'lipstick' ? null : loadItemImage(item)]);
+      const isMakeupStage = ['lipstick', 'blush', 'foundation'].includes(stage);
+      const [input, product] = await Promise.all([loadInput(), isMakeupStage ? null : loadItemImage(item)]);
       if (job.aborted) throw new Aborted();
       const result = await runTask(job, { stage, item, input, product });
       const asset = result.stored?.[0];
@@ -287,19 +294,96 @@ export function createRenderService({
 
   async function runBody(job) {
     const item = job.items.outfit;
-    const key = stageKey({ feature: features.outfit, stage: 'outfit', item, inputKey: photoKey(job.photos.body, 'body') });
-    const hit = job.cache.get(key);
-    if (hit) {
-      if (job.record.stages?.outfit?.status === 'done' && job.record.stages.outfit.key === key) { delete job.live.outfit; emitLook(job); return; }
-      await commitStage(job, 'outfit', { key, entry: hit, cached: true });
+    const bodyPhotoKey = photoKey(job.photos.body, 'body');
+    if (!item) {
+      let bodyCur = { key: bodyPhotoKey, entry: null };
+      if (job.items.watch && !job.aborted) {
+        const stage = 'watch';
+        const stageItem = job.items.watch;
+        const key = stageKey({ feature: features.watch, stage, item: stageItem, inputKey: bodyPhotoKey });
+        const stageHit = job.cache.get(key);
+        if (stageHit) {
+          await commitStage(job, stage, { key, entry: stageHit, cached: true });
+          bodyCur = { key, entry: stageHit };
+        } else {
+          const out = await executeStage(job, {
+            stage, root: 'body', item: stageItem, key,
+            loadInput: () => loadPhoto(job, 'body', LIMITS.bodyMaxSide),
+          });
+          if (out?.entry) bodyCur = { key, entry: out.entry };
+        }
+      }
       return;
     }
-    if (job.aborted) return;
-    await executeStage(job, { stage: 'outfit', root: 'body', item, key, loadInput: () => loadPhoto(job, 'body', LIMITS.bodyMaxSide) });
+    const outfitKey = stageKey({ feature: features.outfit, stage: 'outfit', item, inputKey: bodyPhotoKey });
+    let bodyCur = null;
+    const hit = job.cache.get(outfitKey);
+    if (hit) {
+      if (job.record.stages?.outfit?.status === 'done' && job.record.stages.outfit.key === outfitKey) {
+        delete job.live.outfit;
+        bodyCur = { key: outfitKey, entry: hit };
+      } else {
+        await commitStage(job, 'outfit', { key: outfitKey, entry: hit, cached: true });
+        bodyCur = { key: outfitKey, entry: hit };
+      }
+    } else {
+      if (job.aborted) return;
+      const out = await executeStage(job, { stage: 'outfit', root: 'body', item, key: outfitKey, loadInput: () => loadPhoto(job, 'body', LIMITS.bodyMaxSide) });
+      if (out?.entry) {
+        bodyCur = { key: outfitKey, entry: out.entry };
+      } else {
+        const queuedBodyStages = ['watch'];
+        for (const s of queuedBodyStages) delete job.live[s];
+        emitLook(job);
+        return;
+      }
+    }
+
+    if (!bodyCur?.entry || job.aborted) return;
+
+    // The watch endpoint is configured as 2d-vto/watch and expects a wrist-visible source image.
+    // The current body upload is the available source, so users should provide a full-length photo with
+    // the wrist unobstructed; account-specific feature availability is controlled by YOUCAM_FEATURE_WATCH.
+    const BODY_CHAIN = [{ stage: 'watch', slot: 'watch' }];
+
+    for (const { stage, slot } of BODY_CHAIN) {
+      if (!job.items[slot] || job.aborted) {
+        delete job.live[stage];
+        continue;
+      }
+      const stageFeature = features[stage];
+      const stageItem = job.items[slot];
+      const key = stageKey({ feature: stageFeature, stage, item: stageItem, inputKey: bodyCur.key });
+      const stageHit = job.cache.get(key);
+      if (stageHit) {
+        if (job.record.stages?.[stage]?.status === 'done' && job.record.stages[stage].key === key) {
+          delete job.live[stage];
+          bodyCur = { key, entry: stageHit };
+        } else {
+          await commitStage(job, stage, { key, entry: stageHit, cached: true });
+          bodyCur = { key, entry: stageHit };
+        }
+        continue;
+      }
+      const out = await executeStage(job, {
+        stage,
+        root: 'body',
+        item: stageItem,
+        key,
+        loadInput: () => (bodyCur.entry ? loadStored(bodyCur.entry) : loadPhoto(job, 'body', LIMITS.bodyMaxSide)),
+      });
+      if (out?.entry) {
+        bodyCur = { key, entry: out.entry };
+      } else if (out?.aborted) {
+        return;
+      } else {
+        break;
+      }
+    }
   }
 
   async function runFace(job) {
-    const slots = FACE_ORDER.filter((s) => job.items[s]);
+    const slots = FACE_ORDER.filter((s) => job.items[s] && features[s]);
     if (!slots.length) return;
     let cur = { key: photoKey(job.photos.selfie, 'selfie'), entry: null }; // entry null means the selfie itself
 
@@ -343,7 +427,7 @@ export function createRenderService({
       await Promise.all([runBody(job), runFace(job)]);
     } catch (err) {
       log.error({ err: err.message, lookId: job.lookId }, 'render job crashed');
-      for (const d of STAGES) if (job.live[d.id]) await failStage(job, d.id, friendlyStageError(d.id, err), { attempted: false }).catch(() => {});
+      for (const d of stages) if (job.live[d.id]) await failStage(job, d.id, friendlyStageError(d.id, err), { attempted: false }).catch(() => {});
     } finally {
       job.finished = true;
       job.live = {};
@@ -359,8 +443,8 @@ export function createRenderService({
   // ---------- planning a look from item ids ----------
 
   async function lookFromInput(session, { itemIds, budgetInr } = {}) {
-    if (!Array.isArray(itemIds) || itemIds.length < 1 || itemIds.length > 4 || itemIds.some((x) => typeof x !== 'string' || x.length > 80)) {
-      throw new AppError('INVALID_INPUT', 'Send the ids of the items in the look (an outfit, and optionally a necklace, earrings and lipstick).', 400, { field: 'itemIds' });
+    if (!Array.isArray(itemIds) || itemIds.length < 1 || itemIds.length > SLOTS.length || itemIds.some((x) => typeof x !== 'string' || x.length > 80)) {
+      throw new AppError('INVALID_INPUT', 'Send the ids of the items in the look (an outfit, and optional accessories and makeup).', 400, { field: 'itemIds' });
     }
     if (budgetInr !== undefined && budgetInr !== null && (!Number.isInteger(budgetInr) || budgetInr < BUDGET.min || budgetInr > BUDGET.max)) {
       throw new AppError('INVALID_INPUT', `Choose a budget between ₹${BUDGET.min.toLocaleString('en-IN')} and ₹${BUDGET.max.toLocaleString('en-IN')}.`, 400, { field: 'budgetInr' });
@@ -379,10 +463,30 @@ export function createRenderService({
       if (chosen[item.type]) throw new AppError('INVALID_INPUT', 'A look has at most one item of each kind.', 400, { field: 'itemIds' });
       chosen[item.type] = item;
     }
-    if (!chosen.outfit) throw new AppError('INVALID_INPUT', 'A look needs an outfit.', 400, { field: 'itemIds' });
+    if (chosen.eyewear && !features.eyewear) throw featureUnavailable('eyewear');
+    if (chosen.watch && !features.watch) throw featureUnavailable('watch');
+    if (!chosen.outfit && !chosen.earrings && !chosen.eyewear && !chosen.lipstick && !chosen.blush && !chosen.foundation && !chosen.watch) {
+      throw new AppError('INVALID_INPUT', 'Choose at least one item for virtual try-on.', 400, { field: 'itemIds' });
+    }
+    if ((chosen.outfit || chosen.watch) && !session.photos?.body) {
+      throw new AppError('PHOTOS_REQUIRED', 'Add your full-length photo to try on an outfit or watch.', 409);
+    }
 
     const profile = effectiveProfile(stored);
-    const look = rescoreLook({ look: { items: chosen }, profile, prefs: session.preferences, constraints: budgetInr ? { budgetInr } : {} });
+    const budget = budgetInr ?? session.preferences.budgetInr;
+    const look = chosen.outfit
+      ? rescoreLook({ look: { items: chosen }, profile, prefs: session.preferences, constraints: budgetInr ? { budgetInr } : {} })
+      : {
+        id: accessoryLookId(chosen), items: chosen, itemIds: Object.values(chosen).map((item) => item.id),
+        totalPrice: Object.values(chosen).reduce((sum, item) => sum + (item.price ?? 0), 0),
+        budgetInr: budget, withinBudget: Object.values(chosen).reduce((sum, item) => sum + (item.price ?? 0), 0) <= budget,
+        overBy: Math.max(0, Object.values(chosen).reduce((sum, item) => sum + (item.price ?? 0), 0) - budget),
+        score: 0, components: {}, rules: [], reasons: [], cautions: [],
+      };
+    if (!look.withinBudget) {
+      const money = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
+      throw new AppError('OVER_BUDGET', `This look costs ${money(look.totalPrice)}, which is ${money(look.overBy)} over your budget of ${money(look.budgetInr)}.`, 409, { overBy: look.overBy });
+    }
     // The budget is a hard limit (FR-17), here too: nobody can draw a look that costs more than it.
     if (!look.withinBudget) {
       const money = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
@@ -393,7 +497,7 @@ export function createRenderService({
 
   function gate(session) {
     if (!session.consent?.over18) throw new AppError('CONSENT_REQUIRED', 'Confirm the consent screen first.', 403);
-    if (!session.photos?.selfie || !session.photos?.body) throw new AppError('PHOTOS_REQUIRED', 'Add your selfie and full-length photo first, or choose a sample model.', 409);
+    if (!session.photos?.selfie) throw new AppError('PHOTOS_REQUIRED', 'Add your selfie first, or choose a sample model.', 409);
     if (!storage.isConfigured()) throw new AppError('STORAGE_NOT_CONFIGURED', 'Image storage is not set up on the server yet.', 503);
   }
 
@@ -401,7 +505,13 @@ export function createRenderService({
   function predictHits({ session, look, record, cacheByKey }) {
     const items = look.items;
     const hits = {};
-    hits.outfit = cacheByKey.has(stageKey({ feature: features.outfit, stage: 'outfit', item: items.outfit, inputKey: photoKey(session.photos.body, 'body') }));
+    if (items.outfit) hits.outfit = cacheByKey.has(stageKey({ feature: features.outfit, stage: 'outfit', item: items.outfit, inputKey: photoKey(session.photos.body, 'body') }));
+    if (items.watch) {
+      const bodyInputKey = items.outfit
+        ? stageKey({ feature: features.outfit, stage: 'outfit', item: items.outfit, inputKey: photoKey(session.photos.body, 'body') })
+        : photoKey(session.photos.body, 'body');
+      hits.watch = cacheByKey.has(stageKey({ feature: features.watch, stage: 'watch', item: items.watch, inputKey: bodyInputKey }));
+    }
     let cur = photoKey(session.photos.selfie, 'selfie');
     for (const a of record?.faceChain ?? []) if (items[a.slot] && cacheByKey.has(a.key)) { hits[a.slot] = true; cur = a.key; }
     for (const slot of FACE_ORDER) {
@@ -505,7 +615,7 @@ export function createRenderService({
         sampleModel: fresh.photos.selfie.source === 'sample', catalogId, paidStage: false,
         record: structuredClone(record), cache: cacheByKey, live: {}, listeners: new Set(), events: [], aborted: false, finished: false, startedAt: now(),
       };
-      for (const d of STAGES) {
+      for (const d of stages) {
         if (!look.items[d.slot]) continue;
         const savedDone = record.stages?.[d.id]?.status === 'done' && cacheByKey.has(record.stages[d.id].key);
         if (!savedDone) job.live[d.id] = 'queued';
@@ -579,7 +689,7 @@ export function createRenderService({
       removed = gone.map((e) => e.publicId).filter(Boolean);
       draft.renderCache = draft.renderCache.filter((e) => !goneKeys.has(e.key));
       for (const l of draft.looks) {
-        for (const d of STAGES) {
+        for (const d of stages) {
           const st = l.stages?.[d.id];
           const fromGoneRoot = (d.panel === 'body' && roots.has('body')) || (d.panel === 'face' && roots.has('selfie'));
           if (st && (fromGoneRoot || (st.key && goneKeys.has(st.key)))) l.stages[d.id] = { status: 'idle' };
@@ -632,12 +742,12 @@ export function createRenderService({
   }
 
   async function publicConfig() {
-    const stages = [];
-    for (const d of STAGES) {
+    const publicStages = [];
+    for (const d of stages) {
       const u = await unitsOf(d.slot);
-      stages.push({ id: d.id, label: d.label, panel: d.panel, units: u.units, unitsKnown: u.known });
+      publicStages.push({ id: d.id, label: d.label, panel: d.panel, units: u.units, unitsKnown: u.known });
     }
-    return publicRenderConfig({ stages });
+    return publicRenderConfig({ stages: publicStages });
   }
 
   return { start, startFromId, get, list, watch, remove, dropForPhotos, abortSession, createShare, openShare, shareImage, publicConfig };

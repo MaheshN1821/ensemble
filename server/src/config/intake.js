@@ -22,6 +22,7 @@ export const OCCASIONS = [
   { id: 'date-night', label: 'Date night' },
   { id: 'brunch', label: 'Brunch or day out' },
   { id: 'cocktail', label: 'Cocktail or party' },
+  { id: 'party', label: 'Party' },
 ];
 
 export const SILHOUETTES = [
@@ -54,7 +55,7 @@ export const BUDGET = { min: 2000, max: 300000, step: 500, default: 25000 };
 export const NOTES_MAX = 200;
 export const OCCASION_TEXT_MAX = 120;
 
-// Placeholder sample models. Replace the JPGs in client/public/samples/<id>/ with labelled AI-generated images.
+// Placeholder sample models. Replace the PNGs in client/public/samples/<id>/ with labelled AI-generated images.
 export const SAMPLE_MODELS = [
   { id: 'sample-a', label: 'Sample model A' },
   { id: 'sample-b', label: 'Sample model B' },
@@ -73,7 +74,7 @@ export const publicIntakeConfig = () => ({
   occasionTextMax: OCCASION_TEXT_MAX,
   sampleModels: SAMPLE_MODELS.map((m) => ({
     ...m,
-    selfieUrl: `/samples/${m.id}/selfie.jpg`,
-    bodyUrl: `/samples/${m.id}/body.jpg`,
+    selfieUrl: `/samples/${m.id}/selfi.png`,
+    bodyUrl: `/samples/${m.id}/body.png`,
   })),
 });

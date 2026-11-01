@@ -6,7 +6,7 @@ import { useAgentConfig, useAgentTurn, useGovernor } from '../hooks/useAgent.js'
 import { api } from '../lib/api.js';
 import { downloadLook } from '../lib/downloadLook.js';
 import Button from '../components/Button.jsx';
-import LookResult, { ItemList, StageList } from '../components/looks/LookResult.jsx';
+import LookResult, { ItemList } from '../components/looks/LookResult.jsx';
 import { ErrorNote } from '../components/intake/fields.jsx';
 import LoadingBlock from '../components/ui/LoadingBlock.jsx';
 import Refine from '../components/agent/Refine.jsx';
@@ -69,6 +69,7 @@ function Ready({ look, sessionId, retry, actionError, agent }) {
         {look.canRetry && <Button onClick={retry}>Try the missing steps again</Button>}
         {drawn && <Button variant="secondary" onClick={download}>Download as a picture</Button>}
         <Button to="/looks" variant="secondary">Plan other looks</Button>
+        <Button to={`/build?items=${Object.values(look.items).map((i) => encodeURIComponent(i.id)).join(',')}`} variant="secondary">Change the pieces</Button>
         <Button to="/my-looks" variant="secondary">My looks</Button>
         <Button to={`/compare?a=${look.id}`} variant="secondary">Compare with another look</Button>
       </div>
@@ -76,7 +77,6 @@ function Ready({ look, sessionId, retry, actionError, agent }) {
       <ErrorNote error={downloadError} className="mt-4 max-w-xl" />
       {drawn && !look.active && <div className="mt-6"><Share sessionId={sessionId} lookId={look.id} /></div>}
 
-      <StageList look={look} />
       <ItemList look={look} />
 
       {look.reasons.length > 0 && (

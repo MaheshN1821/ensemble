@@ -1,0 +1,62 @@
+[
+  {
+    "id": "B-801",
+    "type": "blush",
+    "name": "Rose petal floral embossed blush",
+    "price": 450,
+    "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793527932/b-1_mvpll3.png",
+    "gender": "women",
+    "colours": ["#D96F83"],
+    "occasion_tags": ["office", "brunch", "festive"]
+  },
+  {
+    "id": "B-802",
+    "type": "blush",
+    "name": "Peach coral velvet compact blush",
+    "price": 499,
+    "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793527866/b-2_t8ymgf.png",
+    "gender": "women",
+    "colours": ["#E97862"],
+    "occasion_tags": ["party", "brunch"]
+  },
+  {
+    "id": "B-803",
+    "type": "blush",
+    "name": "Soft rose shimmer pressed blush duo",
+    "price": 550,
+    "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793528088/b-3_sujyfj.png",
+    "gender": "women",
+    "colours": ["#D87580"],
+    "occasion_tags": ["office", "party", "festive"]
+  },
+  {
+    "id": "F-804",
+    "type": "foundation",
+    "name": "Radiant glow liquid foundation",
+    "price": 699,
+    "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793527843/f-1_ji3xgd.png",
+    "gender": "unisex",
+    "colours": ["#D59B6A"],
+    "occasion_tags": ["office", "party", "festive"]
+  },
+  {
+    "id": "F-805",
+    "type": "foundation",
+    "name": "Smooth natural finish foundation stick",
+    "price": 649,
+    "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793527887/f-2_lhvgn7.png",
+    "gender": "unisex",
+    "colours": ["#D9A16F"],
+    "occasion_tags": ["office", "party"]
+  },
+  {
+    "id": "F-806",
+    "type": "foundation",
+    "name": "Matte control long wear foundation",
+    "price": 599,
+    "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793528857/f-3_t9gyse.png",
+    "gender": "unisex",
+    "colours": ["#D6A071"],
+    "occasion_tags": ["office", "party", "festive"]
+  }
+]

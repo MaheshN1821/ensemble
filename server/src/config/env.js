@@ -13,6 +13,10 @@ const boolOn = z
 const num = (def, min = 0) => z.coerce.number().min(min).default(def);
 
 const feature = (def) => z.string().trim().min(1).max(60).regex(/^[a-z0-9][a-z0-9/_-]*$/i, 'must be a YouCam feature path such as cloth-v4').default(def);
+const optionalFeature = z.preprocess(
+  (value) => (value === '' ? null : value),
+  z.string().trim().max(60).regex(/^[a-z0-9][a-z0-9/_-]*$/i, 'must be a YouCam feature path such as 2d-vto/eyewear').nullable().optional(),
+);
 
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -40,6 +44,8 @@ const schema = z.object({
   YOUCAM_FEATURE_EARRINGS: feature('2d-vto/earring'),
   YOUCAM_FEATURE_NECKLACE: feature('2d-vto/necklace'),
   YOUCAM_FEATURE_MAKEUP: feature('makeup-vto'),
+  YOUCAM_FEATURE_EYEWEAR: optionalFeature,
+  YOUCAM_FEATURE_WATCH: optionalFeature,
   // The docs describe the jewellery payload two ways. The server tries the others on a 400 and remembers what worked.
   YOUCAM_2D_VTO_STYLE: z.enum(['files', 'info', 'both']).default('files'),
   RENDER_DELETE_TASKS: boolOn,
@@ -129,7 +135,14 @@ export function loadEnv(source = process.env) {
       unknownFeatureUnits: e.UNKNOWN_FEATURE_UNITS,
     },
     render: {
-      features: { outfit: e.YOUCAM_FEATURE_CLOTHES, earrings: e.YOUCAM_FEATURE_EARRINGS, necklace: e.YOUCAM_FEATURE_NECKLACE, lipstick: e.YOUCAM_FEATURE_MAKEUP },
+      features: {
+        outfit: e.YOUCAM_FEATURE_CLOTHES,
+        earrings: e.YOUCAM_FEATURE_EARRINGS,
+        necklace: e.YOUCAM_FEATURE_NECKLACE,
+        lipstick: e.YOUCAM_FEATURE_MAKEUP,
+        eyewear: e.YOUCAM_FEATURE_EYEWEAR,
+        watch: e.YOUCAM_FEATURE_WATCH,
+      },
       vtoStyle: e.YOUCAM_2D_VTO_STYLE,
       deleteTasks: e.RENDER_DELETE_TASKS,
       sessionRenderCap: e.SESSION_RENDER_CAP,

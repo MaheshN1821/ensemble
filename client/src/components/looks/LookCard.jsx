@@ -1,6 +1,6 @@
 import { TYPE_LABEL, rupees } from '../../lib/format.js';
 
-const SLOT_ORDER = ['outfit', 'necklace', 'earrings', 'lipstick'];
+const SLOT_ORDER = ['outfit', 'earrings', 'lipstick', 'eyewear', 'watch'];
 
 function Thumb({ item }) {
   return (

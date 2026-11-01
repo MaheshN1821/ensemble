@@ -1,0 +1,374 @@
+{
+    "items": [
+        {
+            "id": "EW-001",
+            "type": "eyewear",
+            "name": "Champagne Brown Oversized Square Sunglasses",
+            "price": 1799,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793525999/eye-2_r8lkkd.png",
+            "gender": "unisex",
+            "frame_color": "champagne brown",
+            "lens_color": "brown",
+            "formality": 2,
+            "occasion_tags": [
+                "brunch"
+            ]
+        },
+        {
+            "id": "EW-002",
+            "type": "eyewear",
+            "name": "Burgundy Gradient Cat-Eye Sunglasses",
+            "price": 1599,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526000/eye-1_xvu37q.png",
+            "gender": "women",
+            "frame_color": "burgundy",
+            "lens_color": "brown gradient",
+            "formality": 3,
+            "occasion_tags": [
+                "brunch",
+                "date-night"
+            ]
+        },
+        {
+            "id": "EW-003",
+            "type": "eyewear",
+            "name": "Black Cat-Eye Sunglasses with Gold Accents",
+            "price": 2299,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526001/Oversized_Black_Cat-Eye_Sunglasses_ta2yj2.png",
+            "gender": "women",
+            "frame_color": "black and gold",
+            "lens_color": "smoky purple",
+            "formality": 4,
+            "occasion_tags": [
+                "cocktail",
+                "brunch"
+            ]
+        },
+        {
+            "id": "EW-004",
+            "type": "eyewear",
+            "name": "Gold Round-Frame Tortoiseshell Optical Glasses",
+            "price": 1999,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526001/Gold_Round-Frame_Tortoiseshell_Glasses_bubtq5.png",
+            "gender": "unisex",
+            "frame_color": "gold and tortoiseshell",
+            "lens_color": "clear",
+            "formality": 3,
+            "occasion_tags": [
+                "office",
+                "brunch"
+            ]
+        },
+        {
+            "id": "EW-005",
+            "type": "eyewear",
+            "name": "Black Sport Sunglasses with Blue-Purple Mirrored Lens",
+            "price": 1499,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526001/Sporty_Blue-Purple_Mirrored_Sunglasses_ztui4y.png",
+            "gender": "unisex",
+            "frame_color": "black and blue",
+            "lens_color": "blue-purple mirrored",
+            "formality": 1,
+            "occasion_tags": [
+                "brunch"
+            ]
+        },
+        {
+            "id": "EW-006",
+            "type": "eyewear",
+            "name": "Gold Aviator Sunglasses with Dark Green Lenses",
+            "price": 1899,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526000/Gold_Aviator_Sunglasses_on_Transparent_Background_amsfu8.png",
+            "gender": "unisex",
+            "frame_color": "gold",
+            "lens_color": "dark green",
+            "formality": 3,
+            "occasion_tags": [
+                "brunch"
+            ]
+        },
+        {
+            "id": "E-001",
+            "type": "earrings",
+            "name": "Ruby and Pearl Gold Jhumka Earring",
+            "price": 1899,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526000/ear-4_pwr1ln.png",
+            "gender": "women",
+            "metal_tone": "gold",
+            "formality": 5,
+            "occasion_tags": [
+                "festive",
+                "wedding-guest",
+                "sangeet-mehendi"
+            ]
+        },
+        {
+            "id": "E-002",
+            "type": "earrings",
+            "name": "Blue Sapphire Crystal Drop Earring",
+            "price": 2499,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526003/Elegant_Blue_Sapphire_Diamond_Drop_Earring_e22mcs.png",
+            "gender": "women",
+            "metal_tone": "gold",
+            "formality": 5,
+            "occasion_tags": [
+                "cocktail",
+                "wedding-guest"
+            ]
+        },
+        {
+            "id": "E-003",
+            "type": "earrings",
+            "name": "Minimal Polished Gold Chunky Hoop Earring",
+            "price": 999,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526002/Polished_Gold_Hoop_Earring_rkhw4b.png",
+            "gender": "women",
+            "metal_tone": "gold",
+            "formality": 2,
+            "occasion_tags": [
+                "office",
+                "brunch"
+            ]
+        },
+        {
+            "id": "E-004",
+            "type": "earrings",
+            "name": "Purple Butterfly and Gemstone Earring",
+            "price": 1599,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526003/Purple_Butterfly_and_Gemstone_Earring_u4533p.png",
+            "gender": "women",
+            "metal_tone": "gold",
+            "formality": 3,
+            "occasion_tags": [
+                "brunch",
+                "date-night",
+                "cocktail"
+            ]
+        },
+        {
+            "id": "E-005",
+            "type": "earrings",
+            "name": "Gold Huggie Hoop with Pearl Drop Earring",
+            "price": 1299,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526002/Gold_Hoop_and_Pearl_Drop_Earring_asgpl3.png",
+            "gender": "women",
+            "metal_tone": "gold",
+            "formality": 3,
+            "occasion_tags": [
+                "office",
+                "date-night",
+                "brunch"
+            ]
+        },
+        {
+            "id": "E-006",
+            "type": "earrings",
+            "name": "Oxidised Silver Turquoise Feather Earring",
+            "price": 899,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793525999/ear-3_ljrumw.png",
+            "gender": "women",
+            "metal_tone": "oxidised",
+            "formality": 2,
+            "occasion_tags": [
+                "brunch",
+                "festive"
+            ]
+        },
+        {
+            "id": "E-007",
+            "type": "earrings",
+            "name": "Blush Pink Floral Pearl Drop Earring",
+            "price": 1199,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526001/ear-2_tsmcq2.png",
+            "gender": "women",
+            "metal_tone": "gold",
+            "formality": 3,
+            "occasion_tags": [
+                "brunch",
+                "date-night",
+                "wedding-guest"
+            ]
+        },
+        {
+            "id": "E-008",
+            "type": "earrings",
+            "name": "Silver Crystal Leaf Cluster Drop Earring",
+            "price": 1799,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526000/ear-1_kecqsw.png",
+            "gender": "women",
+            "metal_tone": "silver",
+            "formality": 5,
+            "occasion_tags": [
+                "cocktail",
+                "wedding-guest"
+            ]
+        },
+        {
+            "id": "L-001",
+            "type": "lipstick",
+            "name": "Plum Berry Satin Lipstick with Crystal-Embellished Case",
+            "price": 899,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526000/lip-5_vedvcc.png",
+            "gender": "women",
+            "colours": [
+                "#713047"
+            ],
+            "formality": 4,
+            "occasion_tags": [
+                "cocktail",
+                "date-night"
+            ]
+        },
+        {
+            "id": "L-002",
+            "type": "lipstick",
+            "name": "Vibrant Coral Cream Lipstick",
+            "price": 599,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793525999/lip-4_e47vds.png",
+            "gender": "women",
+            "colours": [
+                "#F05A45"
+            ],
+            "formality": 3,
+            "occasion_tags": [
+                "brunch"
+            ]
+        },
+        {
+            "id": "L-003",
+            "type": "lipstick",
+            "name": "Dusty Rose Matte Lipstick with Floral Black Case",
+            "price": 749,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793525999/lip-3_pwxnye.png",
+            "gender": "women",
+            "colours": [
+                "#985568"
+            ],
+            "formality": 3,
+            "occasion_tags": [
+                "office",
+                "brunch",
+                "date-night"
+            ]
+        },
+        {
+            "id": "L-004",
+            "type": "lipstick",
+            "name": "Soft Peach Nude Satin Lipstick",
+            "price": 699,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793525999/lip-2_xz2eor.png",
+            "gender": "women",
+            "colours": [
+                "#C98278"
+            ],
+            "formality": 2,
+            "occasion_tags": [
+                "brunch",
+                "office"
+            ]
+        },
+        {
+            "id": "L-005",
+            "type": "lipstick",
+            "name": "Classic Ruby Red Satin Lipstick",
+            "price": 799,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526000/lip-1_bodnyb.png",
+            "gender": "women",
+            "colours": [
+                "#B51F2B"
+            ],
+            "formality": 4,
+            "occasion_tags": [
+                "festive",
+                "wedding-guest",
+                "cocktail"
+            ]
+        },
+        {
+            "id": "W-001",
+            "type": "watch",
+            "name": "Black and Yellow Rugged Sports Watch",
+            "price": 2499,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526001/Rugged_Black_and_Yellow_Sport_Watch_lhdpvw.png",
+            "gender": "unisex",
+            "colours": [
+                "#171717",
+                "#F2C500"
+            ],
+            "formality": 1,
+            "occasion_tags": [
+                "brunch"
+            ]
+        },
+        {
+            "id": "W-002",
+            "type": "watch",
+            "name": "Rose-Gold Minimalist Watch with Black Leather Strap",
+            "price": 4999,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526001/Rose-Gold_Watch_with_Black_Leather_Strap_1_ig7x2y.png",
+            "gender": "unisex",
+            "metal_tone": "rose-gold",
+            "colours": [
+                "#B77A58",
+                "#171717"
+            ],
+            "formality": 3,
+            "occasion_tags": [
+                "office",
+                "date-night"
+            ]
+        },
+        {
+            "id": "W-003",
+            "type": "watch",
+            "name": "Silver Chronograph Watch with Blue Dial",
+            "price": 6999,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526001/Silver_Chronograph_Watch_with_Blue_Dial_dvawlb.png",
+            "gender": "unisex",
+            "metal_tone": "silver",
+            "colours": [
+                "#C0C0C0",
+                "#123B66"
+            ],
+            "formality": 4,
+            "occasion_tags": [
+                "office",
+                "cocktail"
+            ]
+        },
+        {
+            "id": "W-004",
+            "type": "watch",
+            "name": "Black Smartwatch with Fitness Tracking Display",
+            "price": 5999,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793526001/Smartwatch_Fitness_Dashboard_Product_Shot_llkfkt.png",
+            "gender": "unisex",
+            "colours": [
+                "#171717"
+            ],
+            "formality": 1,
+            "occasion_tags": [
+                "brunch"
+            ]
+        },
+        {
+            "id": "W-005",
+            "type": "watch",
+            "name": "Rose-Gold Crystal Infinity Bracelet Watch",
+            "price": 8999,
+            "image_url": "https://res.cloudinary.com/maheshn18/image/upload/v1793525999/Rose-Gold_Crystal_Infinity_Bracelet_Watch_djismv.png",
+            "gender": "women",
+            "metal_tone": "rose-gold",
+            "colours": [
+                "#C98F70",
+                "#F4E7E2"
+            ],
+            "formality": 5,
+            "occasion_tags": [
+                "wedding-guest",
+                "festive",
+                "cocktail"
+            ]
+        }
+    ]
+}
