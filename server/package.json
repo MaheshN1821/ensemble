@@ -5,8 +5,8 @@
   "type": "module",
   "engines": { "node": ">=20" },
   "scripts": {
-    "dev": "node --watch src/api/index.js",
-    "start": "node src/api/index.js",
+    "dev": "node --watch src/local.js",
+    "start": "node src/local.js",
     "test": "node --test \"test/*.test.js\""
   },
   "dependencies": {
