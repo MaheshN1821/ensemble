@@ -1,6 +1,31 @@
 # Ensemble
 
-One selfie, one full-body photo and an occasion become a complete, coordinated look (outfit, jewellery, lipstick) shown on the shopper's own photos. A deterministic planner picks items within the shopper's budget, the shopper refines the look in plain words, and a retailer can load their own catalog and see anonymous usage counts. Built for the YouCam API Skin AI & eCommerce VTO Hackathon.
+Ensemble is a personalized virtual styling application. A shopper provides a selfie,
+a full-body photo, an occasion, and their preferences. The app analyzes their skin
+tone, selects a coordinated outfit, jewellery, and lipstick from the shared catalog
+within their budget, and renders the result on their own photos using YouCam virtual
+try-on.
+
+The experience is designed as a complete flow:
+
+1. The shopper gives consent, uploads photos (or uses a sample model), and enters
+   their occasion, budget, colors, and style preferences.
+2. A deterministic planner creates three explainable looks. It chooses the products
+   and prices, keeps the budget as a hard limit, and does not require an AI model.
+3. The shopper can refine a look with quick-action chips or plain-language requests
+   such as “less formal, warmer lipstick.”
+4. The selected look is rendered in stages on the shopper's photos. Results are
+   cached so repeated work does not spend YouCam units unnecessarily.
+5. Shoppers can browse product and retailer links, while retailers can upload
+   catalog items and view anonymous usage statistics.
+
+The optional language-model integration only interprets typed refinements and
+rephrases planner-generated facts; it does not choose products, prices, or scores.
+The project was built for the YouCam API Skin AI & eCommerce VTO Hackathon.
+
+- **Live app:** [ensemble-lemon.vercel.app](https://ensemble-lemon.vercel.app/)
+- **Demo video:** [Watch Ensemble on YouTube](https://youtu.be/B4eOY8lKkmU)
+- **Source code:** [github.com/MaheshN1821/ensemble](https://github.com/MaheshN1821/ensemble)
 
 - `client/` React + Vite + Tailwind CSS v4 (JavaScript). Deploys to Vercel.
 - `server/` Node 20 + Express, MongoDB (Mongoose), Cloudinary. Deploys to Render.
@@ -22,7 +47,7 @@ One selfie, one full-body photo and an occasion become a complete, coordinated l
 ```bash
 npm run install:all                      # installs server and client
 
-cp server/.env.example server/.env       # then fill in the four values below
+cp server/.env.example server/.env       # then fill in the required values below
 cp client/.env.example client/.env       # leave VITE_API_URL empty locally
 
 npm run dev:server                       # http://localhost:8080   health: /healthz
